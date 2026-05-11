@@ -22,6 +22,7 @@ typedef struct AppRecorderState {
     atomic_uint captured_events;
     atomic_uint ignored_messages;
     atomic_ullong last_rx_nanos;
+    MidiParserState parser_state;
 } AppRecorderState;
 
 static volatile sig_atomic_t g_stop_requested = 0;
@@ -60,7 +61,7 @@ static void print_usage(const char *program_name) {
             program_name);
 }
 
-static void print_osstatus_and_return(const char *label, OSStatus status) {
+static void log_osstatus_error(const char *label, OSStatus status) {
     fprintf(stderr, "%s failed: OSStatus=%d\n", label, (int)status);
 }
 
@@ -93,16 +94,6 @@ static void draw_status_line(const char *mode,
     fflush(stdout);
 }
 
-static size_t midi_message_length_from_status(uint8_t status) {
-    switch (status & 0xF0) {
-        case 0xC0:
-        case 0xD0:
-            return 2;
-        default:
-            return 3;
-    }
-}
-
 static int cfstring_to_utf8(CFStringRef value, char *buffer, size_t buffer_size) {
     if (buffer == NULL || buffer_size == 0) {
         return 0;
@@ -128,7 +119,7 @@ static void get_endpoint_name(MIDIEndpointRef endpoint, char *buffer, size_t buf
         CFRelease(name);
     }
 
-    snprintf(buffer, buffer_size, "endpoint-%u", (unsigned int)endpoint);
+    snprintf(buffer, buffer_size, "endpoint-%lu", (unsigned long)endpoint);
 }
 
 static MIDIEndpointRef get_source_by_index(long index) {
@@ -148,11 +139,16 @@ static MIDIEndpointRef get_destination_by_index(long index) {
 }
 
 static int parse_long_arg(const char *value, long *result) {
-    char *end = NULL;
-    long parsed = strtol(value, &end, 10);
-    if (value == NULL || *value == '\0' || end == NULL || *end != '\0') {
+    if (value == NULL || *value == '\0' || result == NULL) {
         return 0;
     }
+
+    char *end = NULL;
+    long parsed = strtol(value, &end, 10);
+    if (end == NULL || *end != '\0') {
+        return 0;
+    }
+
     *result = parsed;
     return 1;
 }
@@ -185,7 +181,7 @@ static int add_channel_event(AppRecorderState *state,
 
     OSStatus status = MusicTrackNewMIDIChannelEvent(state->track, beats, &message);
     if (status != noErr) {
-        print_osstatus_and_return("MusicTrackNewMIDIChannelEvent", status);
+        log_osstatus_error("MusicTrackNewMIDIChannelEvent", status);
         return 0;
     }
 
@@ -213,7 +209,7 @@ static int add_sysex_event(AppRecorderState *state,
     OSStatus status = MusicTrackNewMIDIRawDataEvent(state->track, beats, raw);
     free(raw);
     if (status != noErr) {
-        print_osstatus_and_return("MusicTrackNewMIDIRawDataEvent", status);
+        log_osstatus_error("MusicTrackNewMIDIRawDataEvent", status);
         return 0;
     }
 
@@ -246,14 +242,14 @@ static void record_packet_bytes(AppRecorderState *state,
     MusicTimeStamp beats = 0;
     OSStatus status = MusicSequenceGetBeatsForSeconds(state->sequence, elapsed_seconds, &beats);
     if (status != noErr) {
-        print_osstatus_and_return("MusicSequenceGetBeatsForSeconds", status);
+        log_osstatus_error("MusicSequenceGetBeatsForSeconds", status);
         return;
     }
 
     size_t offset = 0;
     while (offset < byte_count) {
         MidiParsedMessage parsed;
-        size_t used = midi_next_message(bytes + offset, byte_count - offset, &parsed);
+        size_t used = midi_next_stream_message(&state->parser_state, bytes + offset, byte_count - offset, &parsed);
         if (used == 0) {
             atomic_fetch_add_explicit(&state->ignored_messages, 1u, memory_order_relaxed);
             break;
@@ -261,7 +257,7 @@ static void record_packet_bytes(AppRecorderState *state,
 
         switch (parsed.kind) {
             case MIDI_PARSED_CHANNEL:
-                if (!add_channel_event(state, bytes + offset, parsed.length, beats)) {
+                if (!add_channel_event(state, parsed.channel_bytes, parsed.channel_length, beats)) {
                     g_stop_requested = 1;
                     return;
                 }
@@ -325,7 +321,6 @@ static int append_playback_event(PlaybackEventList *events,
     memset(event, 0, sizeof(*event));
     event->seconds = seconds;
     event->length = length;
-    event->order = events->next_order++;
 
     if (length <= sizeof(event->inline_bytes)) {
         memcpy(event->inline_bytes, data, length);
@@ -339,6 +334,7 @@ static int append_playback_event(PlaybackEventList *events,
         memcpy(event->data, data, length);
     }
 
+    event->order = events->next_order++;
     events->count += 1;
     return 1;
 }
@@ -365,7 +361,7 @@ static int compare_playback_events(const void *left, const void *right) {
 static int seconds_for_beats(MusicSequence sequence, MusicTimeStamp beats, double *out_seconds) {
     OSStatus status = MusicSequenceGetSecondsForBeats(sequence, beats, out_seconds);
     if (status != noErr) {
-        print_osstatus_and_return("MusicSequenceGetSecondsForBeats", status);
+        log_osstatus_error("MusicSequenceGetSecondsForBeats", status);
         return 0;
     }
     return 1;
@@ -377,14 +373,14 @@ static int collect_track_playback_events(MusicSequence sequence,
     MusicEventIterator iterator = NULL;
     OSStatus status = NewMusicEventIterator(track, &iterator);
     if (status != noErr) {
-        print_osstatus_and_return("NewMusicEventIterator", status);
+        log_osstatus_error("NewMusicEventIterator", status);
         return 0;
     }
 
     Boolean has_current = false;
     status = MusicEventIteratorHasCurrentEvent(iterator, &has_current);
     if (status != noErr) {
-        print_osstatus_and_return("MusicEventIteratorHasCurrentEvent", status);
+        log_osstatus_error("MusicEventIteratorHasCurrentEvent", status);
         DisposeMusicEventIterator(iterator);
         return 0;
     }
@@ -396,10 +392,12 @@ static int collect_track_playback_events(MusicSequence sequence,
         UInt32 event_size = 0;
         status = MusicEventIteratorGetEventInfo(iterator, &beats, &event_type, &event_data, &event_size);
         if (status != noErr) {
-            print_osstatus_and_return("MusicEventIteratorGetEventInfo", status);
+            log_osstatus_error("MusicEventIteratorGetEventInfo", status);
             DisposeMusicEventIterator(iterator);
             return 0;
         }
+        /* Known event structs carry their own fixed fields or embedded raw length. */
+        (void)event_size;
 
         double seconds = 0.0;
         if (!seconds_for_beats(sequence, beats, &seconds)) {
@@ -410,7 +408,7 @@ static int collect_track_playback_events(MusicSequence sequence,
         if (event_type == kMusicEventType_MIDIChannelMessage) {
             const MIDIChannelMessage *message = (const MIDIChannelMessage *)event_data;
             uint8_t bytes[3] = {message->status, message->data1, message->data2};
-            size_t length = midi_message_length_from_status(message->status);
+            size_t length = midi_channel_message_length(message->status);
             if (!append_playback_event(events, seconds, bytes, length)) {
                 DisposeMusicEventIterator(iterator);
                 return 0;
@@ -447,19 +445,17 @@ static int collect_track_playback_events(MusicSequence sequence,
                 DisposeMusicEventIterator(iterator);
                 return 0;
             }
-        } else {
-            (void)event_size;
         }
 
         status = MusicEventIteratorNextEvent(iterator);
         if (status != noErr) {
-            print_osstatus_and_return("MusicEventIteratorNextEvent", status);
+            log_osstatus_error("MusicEventIteratorNextEvent", status);
             DisposeMusicEventIterator(iterator);
             return 0;
         }
         status = MusicEventIteratorHasCurrentEvent(iterator, &has_current);
         if (status != noErr) {
-            print_osstatus_and_return("MusicEventIteratorHasCurrentEvent", status);
+            log_osstatus_error("MusicEventIteratorHasCurrentEvent", status);
             DisposeMusicEventIterator(iterator);
             return 0;
         }
@@ -475,7 +471,7 @@ static int collect_playback_events(MusicSequence sequence,
     UInt32 track_count = 0;
     OSStatus status = MusicSequenceGetTrackCount(sequence, &track_count);
     if (status != noErr) {
-        print_osstatus_and_return("MusicSequenceGetTrackCount", status);
+        log_osstatus_error("MusicSequenceGetTrackCount", status);
         return 0;
     }
 
@@ -483,7 +479,7 @@ static int collect_playback_events(MusicSequence sequence,
         MusicTrack track = NULL;
         status = MusicSequenceGetIndTrack(sequence, i, &track);
         if (status != noErr) {
-            print_osstatus_and_return("MusicSequenceGetIndTrack", status);
+            log_osstatus_error("MusicSequenceGetIndTrack", status);
             return 0;
         }
         if (!collect_track_playback_events(sequence, track, events)) {
@@ -498,7 +494,7 @@ static int collect_playback_events(MusicSequence sequence,
     MusicTimeStamp end_beats = 0;
     status = sequence_length_in_beats(sequence, &end_beats);
     if (status != noErr) {
-        print_osstatus_and_return("sequence_length_in_beats", status);
+        log_osstatus_error("sequence_length_in_beats", status);
         return 0;
     }
 
@@ -521,25 +517,40 @@ static int send_midi_bytes(MIDIPortRef output_port,
         return 0;
     }
 
+    uint8_t stack_buffer[sizeof(MIDIPacketList) + 256];
     size_t packet_list_size = sizeof(MIDIPacketList) + length;
-    MIDIPacketList *packet_list = (MIDIPacketList *)malloc(packet_list_size);
-    if (packet_list == NULL) {
-        fputs("out of memory while sending MIDI\n", stderr);
-        return 0;
+    MIDIPacketList *packet_list = (MIDIPacketList *)stack_buffer;
+    bool heap_allocated = false;
+
+    if (length > 256) {
+        packet_list = (MIDIPacketList *)malloc(packet_list_size);
+        if (packet_list == NULL) {
+            fputs("out of memory while sending MIDI\n", stderr);
+            return 0;
+        }
+        heap_allocated = true;
     }
 
     MIDIPacket *packet = MIDIPacketListInit(packet_list);
     packet = MIDIPacketListAdd(packet_list, packet_list_size, packet, 0, length, bytes);
     if (packet == NULL) {
-        free(packet_list);
+        if (heap_allocated) {
+            free(packet_list);
+        }
         fputs("failed to build MIDI packet list\n", stderr);
         return 0;
     }
 
+#pragma clang diagnostic push
+#pragma clang diagnostic ignored "-Wdeprecated-declarations"
     OSStatus status = MIDISend(output_port, destination, packet_list);
-    free(packet_list);
+#pragma clang diagnostic pop
+
+    if (heap_allocated) {
+        free(packet_list);
+    }
     if (status != noErr) {
-        print_osstatus_and_return("MIDISend", status);
+        log_osstatus_error("MIDISend", status);
         return 0;
     }
 
@@ -605,6 +616,12 @@ static OSStatus save_sequence_to_file(MusicSequence sequence, const char *output
 }
 
 static int command_list(void) {
+    MIDIClientRef client = 0;
+    OSStatus status = MIDIClientCreate(CFSTR("midi-capture-list-client"), NULL, NULL, &client);
+    if (status != noErr) {
+        client = 0;
+    }
+
     const ItemCount source_count = MIDIGetNumberOfSources();
     const ItemCount destination_count = MIDIGetNumberOfDestinations();
     char name[256];
@@ -625,6 +642,9 @@ static int command_list(void) {
         puts("  no MIDI endpoints found");
     }
 
+    if (client != 0) {
+        MIDIClientDispose(client);
+    }
     return 0;
 }
 
@@ -659,16 +679,17 @@ static int command_record(const char *output_path, const char *seconds_arg, cons
     MusicTrack track = NULL;
     AppRecorderState state;
     memset(&state, 0, sizeof(state));
+    midi_parser_state_init(&state.parser_state);
 
     OSStatus status = NewMusicSequence(&sequence);
     if (status != noErr) {
-        print_osstatus_and_return("NewMusicSequence", status);
+        log_osstatus_error("NewMusicSequence", status);
         return 1;
     }
 
     status = MusicSequenceNewTrack(sequence, &track);
     if (status != noErr) {
-        print_osstatus_and_return("MusicSequenceNewTrack", status);
+        log_osstatus_error("MusicSequenceNewTrack", status);
         DisposeMusicSequence(sequence);
         return 1;
     }
@@ -678,14 +699,17 @@ static int command_record(const char *output_path, const char *seconds_arg, cons
 
     status = MIDIClientCreate(CFSTR("midi-capture-client"), NULL, NULL, &client);
     if (status != noErr) {
-        print_osstatus_and_return("MIDIClientCreate", status);
+        log_osstatus_error("MIDIClientCreate", status);
         DisposeMusicSequence(sequence);
         return 1;
     }
 
+#pragma clang diagnostic push
+#pragma clang diagnostic ignored "-Wdeprecated-declarations"
     status = MIDIInputPortCreate(client, CFSTR("midi-capture-input"), midi_read_proc, &state, &input_port);
+#pragma clang diagnostic pop
     if (status != noErr) {
-        print_osstatus_and_return("MIDIInputPortCreate", status);
+        log_osstatus_error("MIDIInputPortCreate", status);
         MIDIClientDispose(client);
         DisposeMusicSequence(sequence);
         return 1;
@@ -693,7 +717,7 @@ static int command_record(const char *output_path, const char *seconds_arg, cons
 
     status = MIDIPortConnectSource(input_port, source, NULL);
     if (status != noErr) {
-        print_osstatus_and_return("MIDIPortConnectSource", status);
+        log_osstatus_error("MIDIPortConnectSource", status);
         MIDIPortDispose(input_port);
         MIDIClientDispose(client);
         DisposeMusicSequence(sequence);
@@ -731,7 +755,7 @@ static int command_record(const char *output_path, const char *seconds_arg, cons
 
     status = save_sequence_to_file(sequence, output_path);
     if (status != noErr) {
-        print_osstatus_and_return("MusicSequenceFileCreate", status);
+        log_osstatus_error("MusicSequenceFileCreate", status);
         MIDIPortDispose(input_port);
         MIDIClientDispose(client);
         DisposeMusicSequence(sequence);
@@ -818,21 +842,14 @@ static int command_play(const char *input_path, const char *destination_arg) {
     OSStatus status = NewMusicSequence(&sequence);
     if (status != noErr) {
         CFRelease(url);
-        print_osstatus_and_return("NewMusicSequence", status);
+        log_osstatus_error("NewMusicSequence", status);
         return 1;
     }
 
     status = MusicSequenceFileLoad(sequence, url, kMusicSequenceFile_AnyType, 0);
     CFRelease(url);
     if (status != noErr) {
-        print_osstatus_and_return("MusicSequenceFileLoad", status);
-        DisposeMusicSequence(sequence);
-        return 1;
-    }
-
-    status = MusicSequenceSetMIDIEndpoint(sequence, destination);
-    if (status != noErr) {
-        print_osstatus_and_return("MusicSequenceSetMIDIEndpoint", status);
+        log_osstatus_error("MusicSequenceFileLoad", status);
         DisposeMusicSequence(sequence);
         return 1;
     }
@@ -846,7 +863,7 @@ static int command_play(const char *input_path, const char *destination_arg) {
 
     status = MIDIClientCreate(CFSTR("midi-capture-playback-client"), NULL, NULL, &client);
     if (status != noErr) {
-        print_osstatus_and_return("MIDIClientCreate", status);
+        log_osstatus_error("MIDIClientCreate", status);
         free_playback_events(&events);
         DisposeMusicSequence(sequence);
         return 1;
@@ -854,7 +871,7 @@ static int command_play(const char *input_path, const char *destination_arg) {
 
     status = MIDIOutputPortCreate(client, CFSTR("midi-capture-output"), &output_port);
     if (status != noErr) {
-        print_osstatus_and_return("MIDIOutputPortCreate", status);
+        log_osstatus_error("MIDIOutputPortCreate", status);
         MIDIClientDispose(client);
         free_playback_events(&events);
         DisposeMusicSequence(sequence);

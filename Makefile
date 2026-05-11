@@ -1,6 +1,5 @@
 CC := clang
 CFLAGS := -std=c11 -Wall -Wextra -Wpedantic -Iinclude
-APP_CFLAGS := $(CFLAGS) -Wno-deprecated-declarations
 APP_LDFLAGS := -framework CoreMIDI -framework AudioToolbox -framework CoreFoundation -framework CoreAudio
 
 APP := midi-capture
@@ -12,7 +11,7 @@ TESTS := test_midi_parser test_status_line
 all: $(APP)
 
 $(APP): $(APP_SRCS)
-	$(CC) $(APP_CFLAGS) -o $@ $(APP_SRCS) $(APP_LDFLAGS)
+	$(CC) $(CFLAGS) -o $@ $(APP_SRCS) $(APP_LDFLAGS)
 
 test_midi_parser: tests/test_midi_parser.c src/midi_parser.c
 	$(CC) $(CFLAGS) -o $@ tests/test_midi_parser.c src/midi_parser.c
@@ -25,4 +24,4 @@ test: $(TESTS)
 	./test_status_line
 
 clean:
-	rm -f $(APP) $(TESTS)
+	rm -f $(APP) $(TESTS) output.mid

@@ -2,7 +2,7 @@
 
 #include <stdio.h>
 
-static void append_timestamp(char *buffer, size_t buffer_size, double seconds) {
+static void format_timestamp(char *buffer, size_t buffer_size, double seconds) {
     int whole_minutes = (int)(seconds / 60.0);
     double remaining_seconds = seconds - (double)(whole_minutes * 60);
     if (remaining_seconds < 0.0) {
@@ -23,10 +23,10 @@ void format_status_line(char *buffer,
     char elapsed_buffer[32];
     char total_buffer[32];
 
-    append_timestamp(elapsed_buffer, sizeof(elapsed_buffer), elapsed_seconds);
+    format_timestamp(elapsed_buffer, sizeof(elapsed_buffer), elapsed_seconds);
     total_buffer[0] = '\0';
     if (has_total) {
-        append_timestamp(total_buffer, sizeof(total_buffer), total_seconds);
+        format_timestamp(total_buffer, sizeof(total_buffer), total_seconds);
         snprintf(buffer,
                  buffer_size,
                  "%s %s/%s RX%c TX%c",
