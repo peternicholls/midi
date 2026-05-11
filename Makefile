@@ -1,9 +1,9 @@
 CC := clang
-CFLAGS := -std=c11 -Wall -Wextra -Wpedantic -Iinclude
+CFLAGS := -std=c11 -Wall -Wextra -Wpedantic -Isrc -Iinclude
 APP_LDFLAGS := -framework CoreMIDI -framework AudioToolbox -framework CoreFoundation -framework CoreAudio
 
 APP := midi-capture
-APP_SRCS := src/main.c src/midi_parser.c src/status_line.c
+APP_SRCS := src/main.c src/app_support.c src/command_list.c src/command_record.c src/command_play.c src/midi_parser.c src/status_line.c
 TESTS := test_midi_parser test_status_line
 
 .PHONY: all clean test
