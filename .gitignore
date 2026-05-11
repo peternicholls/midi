@@ -1,0 +1,8 @@
+.omx/
+
+/midi-capture
+/test_midi_parser
+/test_status_line
+/output.mid
+
+.DS_Store
