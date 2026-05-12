@@ -16,6 +16,11 @@ usable.
   virtual MIDI endpoints.
 - Treat TUI visual work as product work: utility-first, dense, clear, and
   pleasant.
+- Track status in the phase file before starting work. A phase is not complete
+  until its verification section records evidence, not just checked boxes.
+- Prefer generated or source-readable test inputs over opaque binary fixtures.
+  Add checked-in `.mid` fixtures only when file loading itself is the behavior
+  under test.
 
 ## Phase Task Files
 
@@ -32,6 +37,18 @@ usable.
 - [Phase 10: Command Cleanup And Architecture Pass](tui-refactor-sprints/phase-10-command-cleanup-architecture.md)
 - [Phase 11: Final Verification And Release Readiness](tui-refactor-sprints/phase-11-final-verification-release.md)
 
+## Progress Tracking
+
+Each phase file has a `Status` line. Keep it current:
+
+- `Not started`: planning is present, no implementation work has begun.
+- `In progress`: implementation has started, and unchecked tasks remain.
+- `Blocked`: progress requires a specific decision, dependency, or environment.
+- `Complete`: exit criteria and verification evidence are recorded.
+
+Do not start a dependent phase until prerequisite phases are `Complete`, unless
+the dependency line explicitly allows parallel work.
+
 ## Phase 0: Baseline And Safety Net
 
 Goal: establish current behavior and add tests around low-risk pure logic before
@@ -42,8 +59,9 @@ Deliverables:
 - Document the current CLI and TUI behavior that must not regress.
 - Add or extend tests for path formatting, clock formatting, MIDI filename
   filtering, and any pure event-description helpers introduced in later sprints.
-- Identify one or more small `.mid` fixtures for playback-event regression tests
-  if practical.
+- Decide the playback-event test input strategy. Default to generated or
+  in-memory sequences; add small checked-in `.mid` fixtures only when file-load
+  behavior must be covered.
 - Capture a short manual smoke-test checklist for `list`, `record`, `play`, and
   `tui`.
 
@@ -51,6 +69,7 @@ Acceptance criteria:
 
 - `make test` passes.
 - The smoke-test checklist is specific enough for another developer to run.
+- The fixture strategy is documented before Phase 2 starts.
 - No architecture moves happen before the protected behavior is clear.
 
 ## Phase 1: Shared Error And Ownership Conventions
@@ -67,7 +86,8 @@ Deliverables:
 
 Acceptance criteria:
 
-- New conventions are documented in headers or a short docs note.
+- `src/midi_result.h` exists with the agreed result type; conventions are
+  documented in the header or an accompanying docs note.
 - CLI callers can print errors.
 - TUI callers can convert the same errors into status text and log entries.
 
@@ -83,7 +103,7 @@ Likely files:
 - `src/command_play.c`
 - `src/command_tui.c`
 - `Makefile`
-- tests for playback event ordering if fixtures are available
+- `tests/test_midi_sequence.c` — required; event ordering and duration tests
 
 Deliverables:
 
@@ -138,12 +158,16 @@ Likely files:
 - `src/command_record.c`
 - `src/command_tui.c`
 - `Makefile`
+- `tests/test_midi_recorder.c` — required; synchronous recorder logic
+  (async callback path noted as explicitly not covered)
 
 Deliverables:
 
 - Extract recorder state initialization and disposal.
 - Extract channel/SysEx event insertion.
 - Extract packet-byte parsing into sequence events.
+- Preserve the existing `_Atomic` captured/ignored counter behavior so the
+  CoreMIDI callback path stays non-blocking.
 - Keep CLI duration loop and TUI pause/resume/session behavior in their command
   layers.
 
@@ -163,8 +187,8 @@ Likely files:
 
 - `src/midi_describe.c`
 - `src/midi_describe.h`
-- tests for note on/off, control change, program change, pitch bend, SysEx, and
-  unsupported messages
+- tests for note on/off, control change, program change, pitch bend, channel
+  pressure, poly pressure, SysEx, unsupported, and incomplete messages
 
 Deliverables:
 
@@ -197,6 +221,8 @@ Deliverables:
 
 - Extract log ring buffer and snapshot behavior.
 - Extract recordings directory scan, sort, and selection preservation.
+- Add focused tests for log wraparound and file-list behavior with a temporary
+  directory.
 - Keep allocation and disposal APIs obvious.
 
 Acceptance criteria:
@@ -328,6 +354,8 @@ Verification checklist:
 - `./midi-capture record <path> <short-duration> <source-index>`
 - `./midi-capture play <path> <destination-index>`
 - `./midi-capture tui <recordings-dir>`
+- No-device degradation: with no MIDI source or destination available, CLI and
+  TUI paths show readable errors/status and do not crash or hang.
 - TUI manual checks:
   - file browser navigation
   - live stream height and scrolling
@@ -349,7 +377,13 @@ Acceptance criteria:
 
 If the work needs to be batched into larger milestones:
 
-- Milestone A: Phases 0-4, shared MIDI engine and safety net.
-- Milestone B: Phases 5-7, TUI data model and renderer separation.
-- Milestone C: Phases 8-9, visible UX improvements.
-- Milestone D: Phases 10-11, cleanup, verification, and release readiness.
+- Milestone A: Phases 0–4, shared MIDI engine and safety net.
+- Milestone B: Phases 5–7, TUI data model and renderer separation.
+- Milestone C: Phases 8–9, visible UX improvements.
+- Milestone D: Phases 10–11, cleanup, verification, and release readiness.
+
+Milestones are strictly sequential. Each depends on the previous being complete
+and passing `make test`. Do not start Milestone B before Milestone A is merged.
+Do not start Milestone C before Phase 7 renderer isolation is complete; the
+visual redesign in Phase 8 has no stable base without it. Do not start
+Milestone D before all previous milestones pass verification.

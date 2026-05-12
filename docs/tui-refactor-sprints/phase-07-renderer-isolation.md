@@ -1,5 +1,9 @@
 # Phase 7: Renderer Isolation
 
+**Depends on:** Phase 5, Phase 6
+
+**Status:** Not started
+
 ## Objective
 
 Separate curses drawing from TUI state transitions before making visual design
@@ -42,7 +46,8 @@ changes.
 - [ ] `make test`
 - [ ] Launch TUI in a normal terminal.
 - [ ] Launch TUI with a small terminal and confirm minimum-size behavior.
-- [ ] Launch TUI in no-color or limited-color mode if practical.
+- [ ] Launch TUI in no-color or limited-color mode and record the terminal
+  setting used for the check.
 
 ## Exit Criteria
 

@@ -1,5 +1,9 @@
 # Phase 6: TUI Support Modules
 
+**Depends on:** Phase 0, Phase 1, Phase 5
+
+**Status:** Not started
+
 ## Objective
 
 Move non-rendering TUI support logic out of `command_tui.c` so the command file
@@ -18,7 +22,7 @@ can become a coordinator instead of a container for every helper.
   - mutex init/dispose
   - append
   - snapshot
-- [ ] Add tests for log capacity and wraparound if practical.
+- [ ] Add tests for log capacity and wraparound.
 - [ ] Extract recordings file list scanning:
   - directory open/read
   - `.mid` filtering
@@ -26,7 +30,13 @@ can become a coordinator instead of a container for every helper.
   - sort order
   - selected-file preservation
   - free/dispose behavior
-- [ ] Add tests for file-list behavior using a temporary directory if practical.
+- [ ] Migrate `tui_is_midi_filename` and `tui_join_path` from `tui_model.c`
+  into `tui_files.c`; update all callers and migrate their tests.
+- [ ] Keep `tui_format_recording_name`, `tui_format_clock_time`, and
+  `tui_format_midi_bytes` in `tui_model.c` during this phase. Revisit them only
+  in Phase 8 or Phase 10 if all remaining callers move to renderer-specific row
+  formatting.
+- [ ] Add tests for file-list behavior using a temporary directory.
 - [ ] Keep UI status text outside these modules unless it is returned as an
   error.
 - [ ] Update `command_tui.c` to use the new APIs.
@@ -39,9 +49,10 @@ can become a coordinator instead of a container for every helper.
 - `src/tui_log.h`
 - `src/tui_files.c`
 - `src/tui_files.h`
+- `src/tui_model.c` (for migrated function moves)
 - `src/command_tui.c`
-- `tests/test_tui_log.c`
-- `tests/test_tui_files.c`
+- `tests/test_tui_log.c` — required
+- `tests/test_tui_files.c` — required
 - `Makefile`
 
 ## Verification

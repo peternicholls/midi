@@ -1,5 +1,9 @@
 # Phase 9: Directory Browser Flow
 
+**Depends on:** Phase 6, Phase 7, Phase 8
+
+**Status:** Not started
+
 ## Objective
 
 Replace the raw output-directory prompt with a browser-like flow that helps the
@@ -11,6 +15,7 @@ user choose a valid recordings directory.
 - `src/tui_render.c`
 - Phase 6 file-list patterns
 - Phase 7 renderer isolation
+- Phase 8 target layout constraints
 
 ## Tasks
 

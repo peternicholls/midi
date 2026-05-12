@@ -1,5 +1,9 @@
 # Phase 10: Command Cleanup And Architecture Pass
 
+**Depends on:** Phases 2–9
+
+**Status:** Not started
+
 ## Objective
 
 Finish the architectural cleanup after shared modules exist by making command
@@ -27,6 +31,9 @@ files thin adapters.
   - document ownership for public APIs
 - [ ] Revisit `app_support.*` and keep only truly shared app/platform helpers
   there.
+- [ ] Review `status_line.*` for any overlap with the new TUI support modules.
+  Keep it if its responsibility is still distinct (single-line status bar vs.
+  multi-line ring buffer log). Remove it only if it has become fully redundant.
 - [ ] Update README and docs if architecture or user-facing behavior changed.
 - [ ] Run formatting manually by matching the existing C style.
 
@@ -38,6 +45,8 @@ files thin adapters.
 - `src/command_list.c`
 - `src/app_support.c`
 - `src/app_support.h`
+- `src/status_line.c`
+- `src/status_line.h`
 - shared module headers
 - `README.md`
 

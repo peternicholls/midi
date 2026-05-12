@@ -1,5 +1,9 @@
 # Phase 1: Shared Error And Ownership Conventions
 
+**Depends on:** Phase 0
+
+**Status:** Not started
+
 ## Objective
 
 Define conventions before extraction so shared modules do not mix CLI printing,
@@ -34,11 +38,14 @@ TUI logging, CoreMIDI cleanup, and allocation ownership in inconsistent ways.
 
 - `src/app_support.h`
 - `src/app_support.c`
-- possible `src/midi_error.h`
-- possible `docs/error-and-ownership-conventions.md`
+- `src/midi_result.h` — **required deliverable**: defines the shared result type
+  used by all new modules. Must exist before Phase 2 extraction begins.
+- `docs/error-and-ownership-conventions.md` — optional supplement if the header
+  alone is insufficient to record the full decision.
 
 ## Verification
 
+- [ ] `src/midi_result.h` exists with the agreed result type.
 - [ ] Reviewer can tell who owns every object returned by a proposed API.
 - [ ] CLI and TUI callers can adapt the same shared error result to their own
   presentation.
@@ -46,6 +53,8 @@ TUI logging, CoreMIDI cleanup, and allocation ownership in inconsistent ways.
 
 ## Exit Criteria
 
+- `src/midi_result.h` exists and defines the result type used by all new shared
+  modules. This header is the concrete proof Phase 1 is done.
 - Shared modules have an agreed error and ownership style.
 - No extracted module needs to call TUI-specific status or log functions.
 - No extracted module needs to print directly unless it remains CLI-only.

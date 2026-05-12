@@ -1,5 +1,9 @@
 # Phase 5: MIDI Description Model
 
+**Depends on:** Phase 0, Phase 1, Phase 2 (event row struct shape)
+
+**Status:** Not started
+
 ## Objective
 
 Add a shared MIDI description model so the TUI can show English descriptions and

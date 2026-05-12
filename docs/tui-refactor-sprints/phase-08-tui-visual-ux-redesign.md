@@ -1,5 +1,9 @@
 # Phase 8: TUI Visual And UX Redesign
 
+**Depends on:** Phase 7
+
+**Status:** Not started
+
 ## Objective
 
 Make the TUI clearer, more useful, and more pleasant while preserving utility
@@ -44,7 +48,7 @@ density.
 - `src/tui_render.c`
 - `src/tui_render.h`
 - `src/command_tui.c`
-- possible `src/tui_model.c`
+- `src/tui_model.c` if display formatter responsibilities change
 
 ## Verification
 

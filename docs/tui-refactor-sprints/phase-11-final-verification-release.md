@@ -1,5 +1,9 @@
 # Phase 11: Final Verification And Release Readiness
 
+**Depends on:** Phases 0–10
+
+**Status:** Not started
+
 ## Objective
 
 Prove the refactor is complete, documented, and ready to merge or release.
@@ -48,6 +52,9 @@ Prove the refactor is complete, documented, and ready to merge or release.
 - [ ] Output directory browser confirm/cancel/manual path work.
 - [ ] Small terminal fallback is readable.
 - [ ] Monochrome or no-color fallback is readable.
+- [ ] No-device degradation: when no MIDI source or destination is available,
+  the app starts cleanly, shows a clear status message, and does not crash or
+  hang. This covers both TUI startup and playback/record trigger paths.
 
 ## Exit Criteria
 
@@ -62,3 +69,6 @@ Prove the refactor is complete, documented, and ready to merge or release.
   record/play/pause flows.
 - Hardware availability can delay final signoff. A virtual MIDI setup should be
   acceptable for smoke testing when physical hardware is unavailable.
+- The no-device path is a regression risk that is easy to miss when hardware is
+  always present during development. Test it explicitly with all MIDI devices
+  disconnected or virtual endpoints removed.

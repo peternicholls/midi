@@ -1,5 +1,9 @@
 # Phase 3: MIDI Output Engine
 
+**Depends on:** Phase 0, Phase 1, Phase 2
+
+**Status:** Not started
+
 ## Objective
 
 Share CoreMIDI output setup and raw MIDI byte sending between CLI playback and
