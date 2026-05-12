@@ -17,6 +17,21 @@ usable.
 - Treat TUI visual work as product work: utility-first, dense, clear, and
   pleasant.
 
+## Phase Task Files
+
+- [Phase 0: Baseline And Safety Net](tui-refactor-sprints/phase-00-baseline-and-safety-net.md)
+- [Phase 1: Shared Error And Ownership Conventions](tui-refactor-sprints/phase-01-shared-error-and-ownership.md)
+- [Phase 2: Playback Event Engine](tui-refactor-sprints/phase-02-playback-event-engine.md)
+- [Phase 3: MIDI Output Engine](tui-refactor-sprints/phase-03-midi-output-engine.md)
+- [Phase 4: Recording Engine](tui-refactor-sprints/phase-04-recording-engine.md)
+- [Phase 5: MIDI Description Model](tui-refactor-sprints/phase-05-midi-description-model.md)
+- [Phase 6: TUI Support Modules](tui-refactor-sprints/phase-06-tui-support-modules.md)
+- [Phase 7: Renderer Isolation](tui-refactor-sprints/phase-07-renderer-isolation.md)
+- [Phase 8: TUI Visual And UX Redesign](tui-refactor-sprints/phase-08-tui-visual-ux-redesign.md)
+- [Phase 9: Directory Browser Flow](tui-refactor-sprints/phase-09-directory-browser-flow.md)
+- [Phase 10: Command Cleanup And Architecture Pass](tui-refactor-sprints/phase-10-command-cleanup-architecture.md)
+- [Phase 11: Final Verification And Release Readiness](tui-refactor-sprints/phase-11-final-verification-release.md)
+
 ## Phase 0: Baseline And Safety Net
 
 Goal: establish current behavior and add tests around low-risk pure logic before
