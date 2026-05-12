@@ -98,6 +98,42 @@ Suggested modules:
   - remain the coordinator for TUI lifecycle, key handling, and mode transitions
   - call the extracted modules instead of embedding their internals
 
+## Existing Modules
+
+Two source files already exist, are tested, and must be explicitly accounted for
+during the refactor. Without a stated plan their functions risk being duplicated,
+orphaned, or moved inconsistently.
+
+### `tui_model.c` / `tui_model.h`
+
+Contains five pure helpers: `tui_is_midi_filename`, `tui_format_recording_name`,
+`tui_join_path`, `tui_format_midi_bytes`, and `tui_format_clock_time`. All are
+covered by tests in `tests/test_tui_model.c`.
+
+Planned fate during the refactor:
+
+- `tui_is_midi_filename` and `tui_join_path` migrate to `tui_files.c` (Phase 6),
+  because they serve the file-scanning responsibility.
+- `tui_format_midi_bytes` stays in `tui_model.c` as a display formatter; it
+  formats raw bytes as hex for presentation and is not a semantic describer.
+- `tui_format_recording_name` and `tui_format_clock_time` remain in
+  `tui_model.c`, which narrows to a home for pure display formatters that do not
+  belong to a specific engine module.
+- If all functions migrate out during Phase 6 or Phase 8, delete `tui_model.c`
+  and move its tests at that point. Do not delete it speculatively before its
+  callers are updated.
+
+### `status_line.c` / `status_line.h`
+
+A focused 48-line file providing single-line status rendering. It is tested and
+has a distinct responsibility from `tui_log.c`'s ring buffer: `status_line`
+owns one visible status bar row, while `tui_log` owns the multi-line rolling
+log. Both can coexist.
+
+Leave `status_line.*` unchanged through Phases 1–9. Revisit it explicitly in
+Phase 10 alongside `app_support.*` to confirm its responsibility does not
+overlap with any new module.
+
 ## TUI UX Goals
 
 - Use a stable column layout with the file browser on the side. The file browser
@@ -147,6 +183,11 @@ Suggested modules:
   category, timestamp, bytes, and description instead of re-parsing MIDI bytes.
 - Treat color as semantic state, not decoration. Color choices should help users
   distinguish MIDI event types and active transport state quickly.
+- Keep the Makefile pattern consistent. Each new shared module adds its sources
+  to `APP_SRCS`. Each new test binary adds an entry in `TESTS`, a dedicated
+  build rule pairing the test source with the module under test, and a run line
+  in the `test` target. Do not add new include search paths (e.g., `-Iinclude`)
+  without creating the corresponding directory.
 
 ## Migration Plan
 
@@ -163,6 +204,13 @@ Suggested modules:
    `command_play.c` and `command_tui.c` and creates an obvious shared boundary.
    The CLI can keep printing to stderr while the TUI maps errors into status/log
    messages.
+
+   Before implementing `midi_sequence.h`, agree the event struct shape with the
+   Phase 5 MIDI description model design. The contract: `midi_sequence` produces
+   events carrying timestamps and raw MIDI bytes; `midi_describe` (Phase 5)
+   reads those bytes and returns a category and text description; Phases 7–8
+   renderer rows carry both. Define the shared event row struct in Phase 2 so
+   Phase 5 can extend it without requiring a breaking change.
 
 4. Extract MIDI output next. Keep CoreMIDI port ownership explicit so both CLI
    playback and TUI playback use the same send path.
