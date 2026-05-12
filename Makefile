@@ -1,5 +1,5 @@
 CC := clang
-CFLAGS := -std=c11 -Wall -Wextra -Wpedantic -Isrc -Iinclude
+CFLAGS := -std=c11 -Wall -Wextra -Wpedantic -Isrc
 APP_LDFLAGS := -lcurses -framework CoreMIDI -framework AudioToolbox -framework CoreFoundation -framework CoreAudio
 
 APP := midi-capture
