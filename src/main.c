@@ -1,6 +1,7 @@
 #include "command_list.h"
 #include "command_play.h"
 #include "command_record.h"
+#include "command_tui.h"
 
 #include <stdio.h>
 #include <string.h>
@@ -9,9 +10,10 @@ static void print_usage(const char *program_name) {
   fprintf(stderr,
           "Usage:\n"
           "  %s list\n"
+          "  %s tui [recordings-dir]\n"
           "  %s record <output.mid> [seconds] [source-index]\n"
           "  %s play <input.mid> [destination-index]\n",
-          program_name, program_name, program_name);
+          program_name, program_name, program_name, program_name);
 }
 
 static int handle_record_command(int argc, char **argv) {
@@ -36,6 +38,14 @@ static int handle_play_command(int argc, char **argv) {
 static int dispatch_command(int argc, char **argv) {
   if (strcmp(argv[1], "list") == 0) {
     return command_list();
+  }
+
+  if (strcmp(argv[1], "tui") == 0) {
+    if (argc > 3) {
+      print_usage(argv[0]);
+      return 1;
+    }
+    return command_tui(argc > 2 ? argv[2] : NULL);
   }
 
   if (strcmp(argv[1], "record") == 0) {
