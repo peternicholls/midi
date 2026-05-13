@@ -1,7 +1,9 @@
 #include "command_tui.h"
 
 #include "app_support.h"
+#include "midi_output.h"
 #include "midi_parser.h"
+#include "midi_sequence.h"
 #include "tui_model.h"
 
 #include <curses.h>
@@ -50,21 +52,6 @@ typedef struct TuiFileList {
   size_t selected;
 } TuiFileList;
 
-typedef struct TuiPlaybackEvent {
-  double seconds;
-  size_t length;
-  uint8_t inline_bytes[3];
-  uint8_t *data;
-  unsigned long order;
-} TuiPlaybackEvent;
-
-typedef struct TuiPlaybackEventList {
-  TuiPlaybackEvent *items;
-  size_t count;
-  size_t capacity;
-  unsigned long next_order;
-} TuiPlaybackEventList;
-
 typedef struct TuiMonitorSession {
   TuiApp *app;
   MIDIClientRef client;
@@ -98,9 +85,8 @@ typedef struct TuiRecordSession {
 
 typedef struct TuiPlaybackSession {
   TuiApp *app;
-  TuiPlaybackEventList events;
-  MIDIClientRef client;
-  MIDIPortRef output_port;
+  MidiSequenceEventList events;
+  MidiOutput output;
   long destination_index;
   char destination_name[TUI_MAX_NAME];
   char loaded_path[PATH_MAX];
@@ -390,6 +376,27 @@ static void set_osstatus_error(TuiApp *app, const char *label,
   log_line(app, "ERR %s failed: OSStatus=%d", label, (int)status);
 }
 
+static void set_midi_result_error(TuiApp *app, MidiResult result) {
+  const char *operation =
+      result.operation != NULL ? result.operation : "operation";
+
+  switch (result.code) {
+  case MIDI_RESULT_OK:
+    return;
+  case MIDI_RESULT_INVALID_ARGUMENT:
+    set_status(app, "%s failed: invalid argument", operation);
+    log_line(app, "ERR %s failed: invalid argument", operation);
+    return;
+  case MIDI_RESULT_NO_MEMORY:
+    set_status(app, "%s failed: out of memory", operation);
+    log_line(app, "ERR %s failed: out of memory", operation);
+    return;
+  case MIDI_RESULT_OSSTATUS:
+    set_osstatus_error(app, operation, result.os_status);
+    return;
+  }
+}
+
 static void trim_ascii_whitespace(char *text) {
   size_t start = 0;
   size_t end;
@@ -524,368 +531,6 @@ static int scan_recording_files(TuiApp *app) {
   return 1;
 }
 
-static void free_playback_events(TuiPlaybackEventList *events) {
-  if (events == NULL) {
-    return;
-  }
-
-  for (size_t i = 0; i < events->count; ++i) {
-    if (events->items[i].data != NULL &&
-        events->items[i].data != events->items[i].inline_bytes) {
-      free(events->items[i].data);
-    }
-  }
-
-  free(events->items);
-  events->items = NULL;
-  events->count = 0;
-  events->capacity = 0;
-  events->next_order = 0;
-}
-
-static int append_playback_event(TuiApp *app, TuiPlaybackEventList *events,
-                                 double seconds, const uint8_t *data,
-                                 size_t length) {
-  if (events == NULL || data == NULL || length == 0) {
-    return 0;
-  }
-
-  if (events->count == events->capacity) {
-    size_t new_capacity = events->capacity == 0 ? 32 : events->capacity * 2;
-    TuiPlaybackEvent *resized = (TuiPlaybackEvent *)realloc(
-        events->items, new_capacity * sizeof(*resized));
-    if (resized == NULL) {
-      set_status(app, "Out of memory while preparing playback");
-      return 0;
-    }
-    events->items = resized;
-    events->capacity = new_capacity;
-  }
-
-  TuiPlaybackEvent *event = &events->items[events->count];
-  memset(event, 0, sizeof(*event));
-  event->seconds = seconds;
-  event->length = length;
-  if (length <= sizeof(event->inline_bytes)) {
-    memcpy(event->inline_bytes, data, length);
-    event->data = event->inline_bytes;
-  } else {
-    event->data = (uint8_t *)malloc(length);
-    if (event->data == NULL) {
-      set_status(app, "Out of memory while copying MIDI bytes");
-      return 0;
-    }
-    memcpy(event->data, data, length);
-  }
-  event->order = events->next_order++;
-  events->count += 1;
-  return 1;
-}
-
-static int compare_playback_events(const void *left, const void *right) {
-  const TuiPlaybackEvent *a = (const TuiPlaybackEvent *)left;
-  const TuiPlaybackEvent *b = (const TuiPlaybackEvent *)right;
-
-  if (a->seconds < b->seconds) {
-    return -1;
-  }
-  if (a->seconds > b->seconds) {
-    return 1;
-  }
-  if (a->order < b->order) {
-    return -1;
-  }
-  if (a->order > b->order) {
-    return 1;
-  }
-  return 0;
-}
-
-static OSStatus sequence_length_in_beats(MusicSequence sequence,
-                                         MusicTimeStamp *out_beats) {
-  UInt32 track_count = 0;
-  OSStatus status = MusicSequenceGetTrackCount(sequence, &track_count);
-  if (status != noErr) {
-    return status;
-  }
-
-  MusicTimeStamp max_beats = 0;
-  for (UInt32 i = 0; i < track_count; ++i) {
-    MusicTrack track = NULL;
-    MusicTimeStamp track_length = 0;
-    UInt32 property_size = (UInt32)sizeof(track_length);
-
-    status = MusicSequenceGetIndTrack(sequence, i, &track);
-    if (status != noErr) {
-      return status;
-    }
-
-    status = MusicTrackGetProperty(track, kSequenceTrackProperty_TrackLength,
-                                   &track_length, &property_size);
-    if (status != noErr) {
-      return status;
-    }
-    if (track_length > max_beats) {
-      max_beats = track_length;
-    }
-  }
-
-  *out_beats = max_beats;
-  return noErr;
-}
-
-static int seconds_for_beats(TuiApp *app, MusicSequence sequence,
-                             MusicTimeStamp beats, double *out_seconds) {
-  OSStatus status =
-      MusicSequenceGetSecondsForBeats(sequence, beats, out_seconds);
-  if (status != noErr) {
-    set_osstatus_error(app, "MusicSequenceGetSecondsForBeats", status);
-    return 0;
-  }
-  return 1;
-}
-
-static int collect_track_playback_events(TuiApp *app, MusicSequence sequence,
-                                         MusicTrack track,
-                                         TuiPlaybackEventList *events) {
-  MusicEventIterator iterator = NULL;
-  Boolean has_current = false;
-  OSStatus status = NewMusicEventIterator(track, &iterator);
-  if (status != noErr) {
-    set_osstatus_error(app, "NewMusicEventIterator", status);
-    return 0;
-  }
-
-  status = MusicEventIteratorHasCurrentEvent(iterator, &has_current);
-  if (status != noErr) {
-    set_osstatus_error(app, "MusicEventIteratorHasCurrentEvent", status);
-    DisposeMusicEventIterator(iterator);
-    return 0;
-  }
-
-  while (has_current) {
-    MusicTimeStamp beats = 0;
-    MusicEventType event_type = 0;
-    const void *event_data = NULL;
-    UInt32 event_size = 0;
-    double seconds = 0.0;
-
-    status = MusicEventIteratorGetEventInfo(iterator, &beats, &event_type,
-                                            &event_data, &event_size);
-    if (status != noErr) {
-      set_osstatus_error(app, "MusicEventIteratorGetEventInfo", status);
-      DisposeMusicEventIterator(iterator);
-      return 0;
-    }
-    (void)event_size;
-
-    if (!seconds_for_beats(app, sequence, beats, &seconds)) {
-      DisposeMusicEventIterator(iterator);
-      return 0;
-    }
-
-    if (event_type == kMusicEventType_MIDIChannelMessage) {
-      const MIDIChannelMessage *message =
-          (const MIDIChannelMessage *)event_data;
-      uint8_t bytes[3] = {message->status, message->data1, message->data2};
-      size_t length = midi_channel_message_length(message->status);
-      if (!append_playback_event(app, events, seconds, bytes, length)) {
-        DisposeMusicEventIterator(iterator);
-        return 0;
-      }
-    } else if (event_type == kMusicEventType_MIDIRawData) {
-      const MIDIRawData *raw = (const MIDIRawData *)event_data;
-      if (!append_playback_event(app, events, seconds, raw->data,
-                                 raw->length)) {
-        DisposeMusicEventIterator(iterator);
-        return 0;
-      }
-    } else if (event_type == kMusicEventType_MIDINoteMessage) {
-      const MIDINoteMessage *note = (const MIDINoteMessage *)event_data;
-      uint8_t note_on[3] = {(uint8_t)(0x90 | (note->channel & 0x0F)),
-                            note->note, note->velocity};
-      uint8_t note_off[3] = {(uint8_t)(0x80 | (note->channel & 0x0F)),
-                             note->note, note->releaseVelocity};
-      double end_seconds = 0.0;
-
-      if (!append_playback_event(app, events, seconds, note_on,
-                                 sizeof(note_on))) {
-        DisposeMusicEventIterator(iterator);
-        return 0;
-      }
-      if (!seconds_for_beats(app, sequence, beats + note->duration,
-                             &end_seconds)) {
-        DisposeMusicEventIterator(iterator);
-        return 0;
-      }
-      if (!append_playback_event(app, events, end_seconds, note_off,
-                                 sizeof(note_off))) {
-        DisposeMusicEventIterator(iterator);
-        return 0;
-      }
-    }
-
-    status = MusicEventIteratorNextEvent(iterator);
-    if (status != noErr) {
-      set_osstatus_error(app, "MusicEventIteratorNextEvent", status);
-      DisposeMusicEventIterator(iterator);
-      return 0;
-    }
-    status = MusicEventIteratorHasCurrentEvent(iterator, &has_current);
-    if (status != noErr) {
-      set_osstatus_error(app, "MusicEventIteratorHasCurrentEvent", status);
-      DisposeMusicEventIterator(iterator);
-      return 0;
-    }
-  }
-
-  DisposeMusicEventIterator(iterator);
-  return 1;
-}
-
-static int collect_playback_events(TuiApp *app, MusicSequence sequence,
-                                   TuiPlaybackEventList *events,
-                                   double *out_total_seconds) {
-  UInt32 track_count = 0;
-  MusicTimeStamp end_beats = 0;
-  OSStatus status = MusicSequenceGetTrackCount(sequence, &track_count);
-  if (status != noErr) {
-    set_osstatus_error(app, "MusicSequenceGetTrackCount", status);
-    return 0;
-  }
-
-  for (UInt32 i = 0; i < track_count; ++i) {
-    MusicTrack track = NULL;
-    status = MusicSequenceGetIndTrack(sequence, i, &track);
-    if (status != noErr) {
-      set_osstatus_error(app, "MusicSequenceGetIndTrack", status);
-      return 0;
-    }
-    if (!collect_track_playback_events(app, sequence, track, events)) {
-      return 0;
-    }
-  }
-
-  if (events->count > 1) {
-    qsort(events->items, events->count, sizeof(events->items[0]),
-          compare_playback_events);
-  }
-
-  status = sequence_length_in_beats(sequence, &end_beats);
-  if (status != noErr) {
-    set_osstatus_error(app, "sequence_length_in_beats", status);
-    return 0;
-  }
-
-  if (!seconds_for_beats(app, sequence, end_beats, out_total_seconds)) {
-    return 0;
-  }
-  if (events->count > 0 &&
-      events->items[events->count - 1].seconds > *out_total_seconds) {
-    *out_total_seconds = events->items[events->count - 1].seconds;
-  }
-  return 1;
-}
-
-static int load_sequence_from_path(TuiApp *app, const char *input_path,
-                                   MusicSequence *sequence) {
-  CFURLRef url = NULL;
-  OSStatus status;
-
-  if (!create_file_url(input_path, &url)) {
-    set_status(app, "Could not create file URL for %s", input_path);
-    return 0;
-  }
-
-  status = NewMusicSequence(sequence);
-  if (status != noErr) {
-    CFRelease(url);
-    set_osstatus_error(app, "NewMusicSequence", status);
-    return 0;
-  }
-
-  status = MusicSequenceFileLoad(*sequence, url, kMusicSequenceFile_AnyType, 0);
-  CFRelease(url);
-  if (status != noErr) {
-    DisposeMusicSequence(*sequence);
-    *sequence = NULL;
-    set_osstatus_error(app, "MusicSequenceFileLoad", status);
-    return 0;
-  }
-
-  return 1;
-}
-
-static int open_playback_output(TuiApp *app, MIDIClientRef *client,
-                                MIDIPortRef *output_port) {
-  OSStatus status =
-      MIDIClientCreate(CFSTR("midi-capture-tui-playback"), NULL, NULL, client);
-  if (status != noErr) {
-    set_osstatus_error(app, "MIDIClientCreate", status);
-    return 0;
-  }
-
-  status = MIDIOutputPortCreate(*client, CFSTR("midi-capture-tui-output"),
-                                output_port);
-  if (status != noErr) {
-    MIDIClientDispose(*client);
-    *client = 0;
-    set_osstatus_error(app, "MIDIOutputPortCreate", status);
-    return 0;
-  }
-
-  return 1;
-}
-
-static int send_midi_bytes(TuiApp *app, MIDIPortRef output_port,
-                           MIDIEndpointRef destination, const uint8_t *bytes,
-                           size_t length) {
-  uint8_t stack_buffer[sizeof(MIDIPacketList) + 256];
-  size_t packet_list_size = sizeof(MIDIPacketList) + length;
-  MIDIPacketList *packet_list = (MIDIPacketList *)stack_buffer;
-  MIDIPacket *packet;
-  bool heap_allocated = false;
-  OSStatus status;
-
-  if (bytes == NULL || length == 0) {
-    return 0;
-  }
-
-  if (length > 256) {
-    packet_list = (MIDIPacketList *)malloc(packet_list_size);
-    if (packet_list == NULL) {
-      set_status(app, "Out of memory while sending MIDI");
-      return 0;
-    }
-    heap_allocated = true;
-  }
-
-  packet = MIDIPacketListInit(packet_list);
-  packet = MIDIPacketListAdd(packet_list, packet_list_size, packet, 0, length,
-                             bytes);
-  if (packet == NULL) {
-    if (heap_allocated) {
-      free(packet_list);
-    }
-    set_status(app, "Failed to build MIDI packet list");
-    return 0;
-  }
-
-#pragma clang diagnostic push
-#pragma clang diagnostic ignored "-Wdeprecated-declarations"
-  status = MIDISend(output_port, destination, packet_list);
-#pragma clang diagnostic pop
-
-  if (heap_allocated) {
-    free(packet_list);
-  }
-  if (status != noErr) {
-    set_osstatus_error(app, "MIDISend", status);
-    return 0;
-  }
-  return 1;
-}
-
 static void playback_reset_runtime(TuiPlaybackSession *playback) {
   playback->active = false;
   playback->paused = false;
@@ -899,14 +544,7 @@ static void playback_reset_runtime(TuiPlaybackSession *playback) {
 }
 
 static void playback_dispose_transport(TuiPlaybackSession *playback) {
-  if (playback->output_port != 0) {
-    MIDIPortDispose(playback->output_port);
-    playback->output_port = 0;
-  }
-  if (playback->client != 0) {
-    MIDIClientDispose(playback->client);
-    playback->client = 0;
-  }
+  midi_output_close(&playback->output);
 }
 
 static void playback_clear_loaded(TuiPlaybackSession *playback) {
@@ -915,7 +553,7 @@ static void playback_clear_loaded(TuiPlaybackSession *playback) {
   }
 
   playback_dispose_transport(playback);
-  free_playback_events(&playback->events);
+  midi_sequence_event_list_free(&playback->events);
   playback->loaded = false;
   playback->loaded_path[0] = '\0';
   playback->loaded_name[0] = '\0';
@@ -925,11 +563,11 @@ static void playback_clear_loaded(TuiPlaybackSession *playback) {
 }
 
 static int playback_load_selected_file(TuiApp *app) {
-  MusicSequence sequence = NULL;
-  TuiPlaybackEventList events;
+  MidiSequenceEventList events;
   double total_seconds = 0.0;
+  MidiResult result;
 
-  memset(&events, 0, sizeof(events));
+  midi_sequence_event_list_init(&events);
 
   if (app->files.count == 0 || app->files.selected >= app->files.count) {
     playback_clear_loaded(&app->playback);
@@ -942,16 +580,13 @@ static int playback_load_selected_file(TuiApp *app) {
     return 1;
   }
 
-  if (!load_sequence_from_path(app, app->files.items[app->files.selected].path,
-                               &sequence)) {
+  result = midi_sequence_load_events_from_file(
+      app->files.items[app->files.selected].path, &events, &total_seconds);
+  if (!midi_result_is_ok(result)) {
+    midi_sequence_event_list_free(&events);
+    set_midi_result_error(app, result);
     return 0;
   }
-  if (!collect_playback_events(app, sequence, &events, &total_seconds)) {
-    free_playback_events(&events);
-    DisposeMusicSequence(sequence);
-    return 0;
-  }
-  DisposeMusicSequence(sequence);
 
   playback_clear_loaded(&app->playback);
   app->playback.events = events;
@@ -1339,6 +974,7 @@ static void stop_playback_session(TuiApp *app, bool completed) {
 
 static int start_playback_session(TuiApp *app) {
   MIDIEndpointRef destination;
+  MidiResult result;
 
   if (app->playback.active) {
     set_status(app, "Playback is already active");
@@ -1368,8 +1004,11 @@ static int start_playback_session(TuiApp *app) {
     set_status(app, "Destination [0] is not available");
     return 0;
   }
-  if (!open_playback_output(app, &app->playback.client,
-                            &app->playback.output_port)) {
+  result = midi_output_open(&app->playback.output,
+                            CFSTR("midi-capture-tui-playback"),
+                            CFSTR("midi-capture-tui-output"));
+  if (!midi_result_is_ok(result)) {
+    set_midi_result_error(app, result);
     return 0;
   }
 
@@ -1428,6 +1067,7 @@ static void toggle_playback_pause(TuiApp *app) {
 static void playback_tick(TuiApp *app) {
   MIDIEndpointRef destination;
   double current_position;
+  MidiResult result;
 
   if (!app->playback.active || app->playback.paused) {
     return;
@@ -1444,10 +1084,12 @@ static void playback_tick(TuiApp *app) {
   while (app->playback.current_index < app->playback.events.count &&
          app->playback.events.items[app->playback.current_index].seconds <=
              current_position) {
-    TuiPlaybackEvent *event =
+    MidiSequenceEvent *event =
         &app->playback.events.items[app->playback.current_index];
-    if (!send_midi_bytes(app, app->playback.output_port, destination,
-                         event->data, event->length)) {
+    result = midi_output_send(&app->playback.output, destination, event->data,
+                              event->length);
+    if (!midi_result_is_ok(result)) {
+      set_midi_result_error(app, result);
       stop_playback_session(app, false);
       return;
     }
@@ -1854,6 +1496,7 @@ static int initialize_tui(TuiApp *app, const char *recordings_dir) {
   midi_parser_state_init(&app->monitor.parser_state);
   app->record.app = app;
   app->playback.app = app;
+  midi_output_init(&app->playback.output);
   set_status(app, "Ready");
   if (!ensure_directory_exists(app->recordings_dir)) {
     pthread_mutex_destroy(&app->log.mutex);

@@ -2,6 +2,7 @@
 
 /midi-capture
 /test_midi_parser
+/test_midi_sequence
 /test_status_line
 /output.mid
 

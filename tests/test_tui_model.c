@@ -8,6 +8,8 @@ static void test_midi_filename_match_is_case_insensitive(void) {
   assert(tui_is_midi_filename("take.mid") == 1);
   assert(tui_is_midi_filename("TAKE.MID") == 1);
   assert(tui_is_midi_filename("take.midi") == 0);
+  assert(tui_is_midi_filename("mid") == 0);
+  assert(tui_is_midi_filename(NULL) == 0);
 }
 
 static void test_recording_name_uses_timestamp_shape(void) {
@@ -28,6 +30,7 @@ static void test_recording_name_uses_timestamp_shape(void) {
 
 static void test_join_path_avoids_double_separator(void) {
   char path[64];
+  char small_path[8];
 
   assert(tui_join_path(path, sizeof(path), "/tmp/recordings", "take.mid") == 1);
   assert(strcmp(path, "/tmp/recordings/take.mid") == 0);
@@ -35,6 +38,12 @@ static void test_join_path_avoids_double_separator(void) {
   assert(tui_join_path(path, sizeof(path), "/tmp/recordings/", "take.mid") ==
          1);
   assert(strcmp(path, "/tmp/recordings/take.mid") == 0);
+
+  assert(tui_join_path(path, sizeof(path), ".", "take.mid") == 1);
+  assert(strcmp(path, "take.mid") == 0);
+
+  assert(tui_join_path(small_path, sizeof(small_path), "/tmp", "take.mid") ==
+         0);
 }
 
 static void test_format_midi_bytes_renders_hex_stream(void) {
@@ -52,6 +61,9 @@ static void test_format_clock_time_matches_status_style(void) {
   tui_format_clock_time(text, sizeof(text), 61.2);
 
   assert(strcmp(text, "01:01.2") == 0);
+
+  tui_format_clock_time(text, sizeof(text), -3.0);
+  assert(strcmp(text, "00:00.0") == 0);
 }
 
 int main(void) {

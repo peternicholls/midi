@@ -2,7 +2,7 @@
 
 **Depends on:** Phase 0, Phase 1, Phase 2
 
-**Status:** Not started
+**Status:** Complete
 
 ## Objective
 
@@ -18,17 +18,17 @@ TUI playback.
 
 ## Tasks
 
-- [ ] Compare CLI and TUI output-port creation and disposal.
-- [ ] Compare raw MIDI packet construction and `MIDISend` usage.
-- [ ] Design `midi_output.h` around explicit client/port ownership.
-- [ ] Extract output open/close behavior into `midi_output.c`.
-- [ ] Extract raw byte send behavior into `midi_output.c`.
-- [ ] Keep endpoint selection in caller code unless a shared endpoint module is
+- [x] Compare CLI and TUI output-port creation and disposal.
+- [x] Compare raw MIDI packet construction and `MIDISend` usage.
+- [x] Design `midi_output.h` around explicit client/port ownership.
+- [x] Extract output open/close behavior into `midi_output.c`.
+- [x] Extract raw byte send behavior into `midi_output.c`.
+- [x] Keep endpoint selection in caller code unless a shared endpoint module is
   clearly useful.
-- [ ] Update `command_play.c` to use shared MIDI output.
-- [ ] Update `command_tui.c` to use shared MIDI output.
-- [ ] Remove duplicated output helpers.
-- [ ] Update `Makefile`.
+- [x] Update `command_play.c` to use shared MIDI output.
+- [x] Update `command_tui.c` to use shared MIDI output.
+- [x] Remove duplicated output helpers.
+- [x] Update `Makefile`.
 
 ## Suggested Files
 
@@ -40,12 +40,28 @@ TUI playback.
 
 ## Verification
 
-- [ ] `make clean`
-- [ ] `make`
-- [ ] `make test`
-- [ ] CLI playback sends MIDI to a selected destination.
-- [ ] TUI playback sends MIDI to destination `0` as before.
-- [ ] Disconnecting or losing a destination still produces a readable error.
+- [x] `make clean`
+- [x] `make`
+- [x] `make test`
+- [x] CLI playback sends MIDI to a selected destination.
+- [x] TUI playback sends MIDI to destination `0` as before.
+- [x] Disconnecting or losing a destination still produces a readable error.
+
+Evidence:
+
+- Added `src/midi_output.c` and `src/midi_output.h`.
+- `MidiOutput` owns the CoreMIDI client and output port; callers select
+  endpoints and translate `MidiResult` into their own presentation.
+- `command_play.c` and `command_tui.c` now share `midi_output_open`,
+  `midi_output_close`, and `midi_output_send`.
+- `make clean && make && make test` passed.
+- `./midi-capture play recordings/20260512040548.mid 0` completed against
+  destination `[0] KeyLab 88`.
+- TUI smoke showed destination `[0] KeyLab 88` and still loaded the selected
+  recording.
+- Destination loss remains caller-readable: `playback_tick` still checks
+  `get_destination_by_index` before sending and reports `Destination [0] is not
+  available`; send failures are mapped through `set_midi_result_error`.
 
 ## Exit Criteria
 

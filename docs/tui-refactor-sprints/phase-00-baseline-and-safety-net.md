@@ -2,7 +2,7 @@
 
 **Depends on:** nothing — this phase must complete before any other phase begins.
 
-**Status:** Not started
+**Status:** Complete
 
 ## Objective
 
@@ -19,23 +19,23 @@ evidence that later extractions are refactors, not accidental rewrites.
 
 ## Tasks
 
-- [ ] Inventory current command behavior:
+- [x] Inventory current command behavior:
   - `./midi-capture list`
   - `./midi-capture record <path> [seconds] [source-index]`
   - `./midi-capture play <path> [destination-index]`
   - `./midi-capture tui [recordings-dir]`
-- [ ] Create a manual smoke-test checklist for hardware-dependent behavior.
-- [ ] Extend tests for existing pure helpers:
+- [x] Create a manual smoke-test checklist for hardware-dependent behavior.
+- [x] Extend tests for existing pure helpers:
   - MIDI filename filtering
   - recording filename formatting
   - path joining
   - clock formatting
-- [ ] Use generated or in-memory sequences for playback-event tests by default.
+- [x] Use generated or in-memory sequences for playback-event tests by default.
   Add checked-in `.mid` fixtures only if file loading itself must be tested.
-- [ ] Add one simple playback-event ordering input and one input with multiple
+- [x] Add one simple playback-event ordering input and one input with multiple
   MIDI event kinds, using the fixture strategy above.
-- [ ] Run baseline build and tests before any extraction starts.
-- [ ] Document the expected Makefile pattern for new modules and tests:
+- [x] Run baseline build and tests before any extraction starts.
+- [x] Document the expected Makefile pattern for new modules and tests:
   each new module's `.c` file adds to `APP_SRCS`; each new test binary
   adds to `TESTS`, gets its own build rule pairing the test source with the
   module under test, and gets a run line in the `test` target. Record this
@@ -51,11 +51,23 @@ evidence that later extractions are refactors, not accidental rewrites.
 
 ## Verification
 
-- [ ] `make clean`
-- [ ] `make`
-- [ ] `make test`
-- [ ] Manual smoke-test checklist can be followed by someone other than the
+- [x] `make clean`
+- [x] `make`
+- [x] `make test`
+- [x] Manual smoke-test checklist can be followed by someone other than the
   author.
+
+Evidence:
+
+- Baseline command run: `make clean && make && make test` passed before
+  extraction work started.
+- Current command behavior and hardware-dependent checks are documented in
+  `docs/manual-smoke-test.md`.
+- Existing helper tests now cover invalid MIDI filenames, current-directory path
+  joins, truncated path joins, and negative clock input.
+- Playback-event tests will use generated in-memory `MusicSequence` inputs by
+  default in Phase 2; checked-in `.mid` fixtures are deferred unless file-load
+  behavior itself needs coverage.
 
 ## Exit Criteria
 

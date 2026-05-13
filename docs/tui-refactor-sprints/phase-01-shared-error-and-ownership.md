@@ -2,7 +2,7 @@
 
 **Depends on:** Phase 0
 
-**Status:** Not started
+**Status:** Complete
 
 ## Objective
 
@@ -17,22 +17,22 @@ TUI logging, CoreMIDI cleanup, and allocation ownership in inconsistent ways.
 
 ## Tasks
 
-- [ ] Identify current error styles:
+- [x] Identify current error styles:
   - direct `fprintf`/`fputs`
   - `log_osstatus_error`
   - TUI `set_status`
   - TUI `log_line`
-- [ ] Define the minimum shared error shape needed for reusable modules.
-- [ ] Decide how OSStatus values are represented without requiring shared
+- [x] Define the minimum shared error shape needed for reusable modules.
+- [x] Decide how OSStatus values are represented without requiring shared
   modules to print.
-- [ ] Decide how allocation and invalid-argument errors are represented.
-- [ ] Define naming conventions:
+- [x] Decide how allocation and invalid-argument errors are represented.
+- [x] Define naming conventions:
   - `*_init` for caller-owned structs
   - `*_dispose` for releasing internal resources without freeing the struct
   - `*_free` for heap-owned collections
   - `*_open` and `*_close` for CoreMIDI ports/clients
-- [ ] Add a short docs note or header comments recording the convention.
-- [ ] Update the sprint plan if a better convention emerges during review.
+- [x] Add a short docs note or header comments recording the convention.
+- [x] Update the sprint plan if a better convention emerges during review.
 
 ## Suggested Files
 
@@ -45,11 +45,22 @@ TUI logging, CoreMIDI cleanup, and allocation ownership in inconsistent ways.
 
 ## Verification
 
-- [ ] `src/midi_result.h` exists with the agreed result type.
-- [ ] Reviewer can tell who owns every object returned by a proposed API.
-- [ ] CLI and TUI callers can adapt the same shared error result to their own
+- [x] `src/midi_result.h` exists with the agreed result type.
+- [x] Reviewer can tell who owns every object returned by a proposed API.
+- [x] CLI and TUI callers can adapt the same shared error result to their own
   presentation.
-- [ ] `make test` passes if code or tests are changed.
+- [x] `make test` passes if code or tests are changed.
+
+Evidence:
+
+- `src/midi_result.h` defines `MidiResult`, `MidiResultCode`, and constructors
+  for OK, invalid-argument, allocation, and OSStatus results.
+- Header comments record the shared-module rule that reusable modules return
+  errors without printing, writing TUI status, or appending TUI logs.
+- Ownership naming conventions are recorded next to the result type so new
+  module APIs can follow the same `init`/`dispose`/`free`/`open`/`close`
+  vocabulary.
+- `make test` passed after adding the header.
 
 ## Exit Criteria
 
