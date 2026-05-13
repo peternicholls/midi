@@ -3,6 +3,7 @@
 #include "app_support.h"
 #include "midi_output.h"
 #include "midi_parser.h"
+#include "midi_recorder.h"
 #include "midi_sequence.h"
 #include "tui_model.h"
 
@@ -27,6 +28,7 @@
 #define TUI_MAX_NAME 256
 #define TUI_MAX_LOG_LINES 128
 #define TUI_MAX_LOG_LINE_LENGTH 160
+#define TUI_INPUT_TIMEOUT_MS 30
 
 typedef struct TuiApp TuiApp;
 
@@ -66,8 +68,7 @@ typedef struct TuiMonitorSession {
 
 typedef struct TuiRecordSession {
   TuiApp *app;
-  MusicSequence sequence;
-  MusicTrack track;
+  MidiRecorder recorder;
   long source_index;
   char source_name[TUI_MAX_NAME];
   char output_path[PATH_MAX];
@@ -78,9 +79,6 @@ typedef struct TuiRecordSession {
   bool active;
   bool paused;
   bool has_first_host_time;
-  atomic_uint captured_events;
-  atomic_uint ignored_messages;
-  MidiParserState parser_state;
 } TuiRecordSession;
 
 typedef struct TuiPlaybackSession {
@@ -604,23 +602,11 @@ static int playback_load_selected_file(TuiApp *app) {
 }
 
 static int initialize_record_state(TuiApp *app, TuiRecordSession *record) {
-  OSStatus status;
-
   memset(record, 0, sizeof(*record));
   record->app = app;
-  midi_parser_state_init(&record->parser_state);
-
-  status = NewMusicSequence(&record->sequence);
-  if (status != noErr) {
-    set_osstatus_error(app, "NewMusicSequence", status);
-    return 0;
-  }
-
-  status = MusicSequenceNewTrack(record->sequence, &record->track);
-  if (status != noErr) {
-    DisposeMusicSequence(record->sequence);
-    record->sequence = NULL;
-    set_osstatus_error(app, "MusicSequenceNewTrack", status);
+  MidiResult result = midi_recorder_init(&record->recorder);
+  if (!midi_result_is_ok(result)) {
+    set_midi_result_error(app, result);
     return 0;
   }
 
@@ -628,71 +614,17 @@ static int initialize_record_state(TuiApp *app, TuiRecordSession *record) {
 }
 
 static void dispose_record_resources(TuiRecordSession *record) {
-  if (record->sequence != NULL) {
-    DisposeMusicSequence(record->sequence);
-    record->sequence = NULL;
-  }
-}
-
-static int add_channel_event(TuiRecordSession *record, const uint8_t *bytes,
-                             size_t length, MusicTimeStamp beats) {
-  MIDIChannelMessage message;
-  OSStatus status;
-
-  if (record == NULL || bytes == NULL || length < 2) {
-    return 0;
+  if (record == NULL) {
+    return;
   }
 
-  memset(&message, 0, sizeof(message));
-  message.status = bytes[0];
-  message.data1 = length > 1 ? bytes[1] : 0;
-  message.data2 = length > 2 ? bytes[2] : 0;
-
-  status = MusicTrackNewMIDIChannelEvent(record->track, beats, &message);
-  if (status != noErr) {
-    set_osstatus_error(record->app, "MusicTrackNewMIDIChannelEvent", status);
-    return 0;
-  }
-
-  atomic_fetch_add_explicit(&record->captured_events, 1u, memory_order_relaxed);
-  return 1;
-}
-
-static int add_sysex_event(TuiRecordSession *record, const uint8_t *bytes,
-                           size_t length, MusicTimeStamp beats) {
-  MIDIRawData *raw;
-  OSStatus status;
-
-  if (record == NULL || bytes == NULL || length == 0) {
-    return 0;
-  }
-
-  raw = (MIDIRawData *)malloc(sizeof(MIDIRawData) + length - 1);
-  if (raw == NULL) {
-    set_status(record->app, "Out of memory while recording SysEx");
-    return 0;
-  }
-
-  raw->length = (UInt32)length;
-  memcpy(raw->data, bytes, length);
-  status = MusicTrackNewMIDIRawDataEvent(record->track, beats, raw);
-  free(raw);
-  if (status != noErr) {
-    set_osstatus_error(record->app, "MusicTrackNewMIDIRawDataEvent", status);
-    return 0;
-  }
-
-  atomic_fetch_add_explicit(&record->captured_events, 1u, memory_order_relaxed);
-  return 1;
+  midi_recorder_dispose(&record->recorder);
 }
 
 static void record_packet_bytes(TuiRecordSession *record, const uint8_t *bytes,
                                 size_t byte_count, uint64_t host_time) {
-  size_t offset = 0;
   double elapsed_seconds = 0.0;
   uint64_t adjusted_host_time;
-  MusicTimeStamp beats = 0;
-  OSStatus status;
 
   if (record == NULL || bytes == NULL || byte_count == 0 || !record->active ||
       record->paused) {
@@ -711,48 +643,11 @@ static void record_packet_bytes(TuiRecordSession *record, const uint8_t *bytes,
         1000000000.0;
   }
 
-  status = MusicSequenceGetBeatsForSeconds(record->sequence, elapsed_seconds,
-                                           &beats);
-  if (status != noErr) {
-    set_osstatus_error(record->app, "MusicSequenceGetBeatsForSeconds", status);
-    return;
-  }
-
-  while (offset < byte_count) {
-    MidiParsedMessage parsed;
-    size_t used = midi_next_stream_message(
-        &record->parser_state, bytes + offset, byte_count - offset, &parsed);
-    if (used == 0) {
-      atomic_fetch_add_explicit(&record->ignored_messages, 1u,
-                                memory_order_relaxed);
-      break;
-    }
-
-    switch (parsed.kind) {
-    case MIDI_PARSED_CHANNEL:
-      if (!add_channel_event(record, parsed.channel_bytes,
-                             parsed.channel_length, beats)) {
-        g_stop_requested = 1;
-        return;
-      }
-      break;
-    case MIDI_PARSED_SYSEX:
-      if (!add_sysex_event(record, bytes + offset, parsed.length, beats)) {
-        g_stop_requested = 1;
-        return;
-      }
-      break;
-    case MIDI_PARSED_UNSUPPORTED:
-      atomic_fetch_add_explicit(&record->ignored_messages, 1u,
-                                memory_order_relaxed);
-      break;
-    case MIDI_PARSED_INCOMPLETE:
-      atomic_fetch_add_explicit(&record->ignored_messages, 1u,
-                                memory_order_relaxed);
-      return;
-    }
-
-    offset += used;
+  MidiResult result = midi_recorder_record_packet_bytes(
+      &record->recorder, bytes, byte_count, elapsed_seconds);
+  if (!midi_result_is_ok(result)) {
+    set_midi_result_error(record->app, result);
+    g_stop_requested = 1;
   }
 }
 
@@ -801,13 +696,11 @@ static int stop_record_session(TuiApp *app, bool save_file) {
   }
 
   if (save_file) {
-    status =
-        save_sequence_to_file(app->record.sequence, app->record.output_path);
+    status = save_sequence_to_file(
+        midi_recorder_sequence(&app->record.recorder), app->record.output_path);
   }
-  captured =
-      atomic_load_explicit(&app->record.captured_events, memory_order_relaxed);
-  ignored =
-      atomic_load_explicit(&app->record.ignored_messages, memory_order_relaxed);
+  captured = midi_recorder_captured_events(&app->record.recorder);
+  ignored = midi_recorder_ignored_messages(&app->record.recorder);
 
   dispose_record_resources(&app->record);
   app->record.active = false;
@@ -1292,10 +1185,8 @@ static void draw_footer(TuiApp *app, int row, int cols) {
                           record_elapsed_seconds(&app->record));
     snprintf(summary, sizeof(summary),
              "REC %s  %u event(s)  %u ignored  output %s", clock_text,
-             atomic_load_explicit(&app->record.captured_events,
-                                  memory_order_relaxed),
-             atomic_load_explicit(&app->record.ignored_messages,
-                                  memory_order_relaxed),
+             midi_recorder_captured_events(&app->record.recorder),
+             midi_recorder_ignored_messages(&app->record.recorder),
              app->record.output_path);
   } else if (app->playback.active || app->playback.loaded) {
     tui_format_clock_time(clock_text, sizeof(clock_text),
@@ -1398,13 +1289,13 @@ static void prompt_for_output_directory(TuiApp *app) {
   getmaxyx(stdscr, rows, cols);
   echo();
   curs_set(1);
-  nodelay(stdscr, FALSE);
+  timeout(-1);
   mvhline(rows - 2, 0, ' ', cols);
   mvprintw(rows - 2, 2, "Recordings directory: ");
   getnstr(input, (int)sizeof(input) - 1);
   noecho();
   curs_set(0);
-  nodelay(stdscr, TRUE);
+  timeout(TUI_INPUT_TIMEOUT_MS);
 
   trim_ascii_whitespace(input);
   if (input[0] == '\0') {
@@ -1537,7 +1428,7 @@ int command_tui(const char *recordings_dir) {
   cbreak();
   noecho();
   keypad(stdscr, TRUE);
-  nodelay(stdscr, TRUE);
+  timeout(TUI_INPUT_TIMEOUT_MS);
   curs_set(0);
   if (has_colors()) {
     start_color();
@@ -1557,7 +1448,6 @@ int command_tui(const char *recordings_dir) {
     if (ch != ERR) {
       handle_keypress(&app, ch, &should_quit);
     }
-    usleep(30000);
   }
 
   endwin();

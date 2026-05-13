@@ -1,76 +1,46 @@
 #include "command_record.h"
 
 #include "app_support.h"
-#include "midi_parser.h"
+#include "midi_recorder.h"
 
 #include <stdatomic.h>
 #include <stdbool.h>
 #include <stdio.h>
-#include <stdlib.h>
 #include <string.h>
 
 typedef struct AppRecorderState {
-  MusicSequence sequence;
-  MusicTrack track;
+  MidiRecorder recorder;
   uint64_t first_host_time;
   bool has_first_host_time;
-  atomic_uint captured_events;
-  atomic_uint ignored_messages;
   atomic_ullong last_rx_nanos;
-  MidiParserState parser_state;
 } AppRecorderState;
 
-static int add_channel_event(AppRecorderState *state, const uint8_t *bytes,
-                             size_t length, MusicTimeStamp beats) {
-  if (state == NULL || bytes == NULL || length < 2) {
-    return 0;
+static int report_recorder_result(MidiResult result) {
+  if (midi_result_is_ok(result)) {
+    return 1;
   }
 
-  MIDIChannelMessage message;
-  memset(&message, 0, sizeof(message));
-  message.status = bytes[0];
-  message.data1 = length > 1 ? bytes[1] : 0;
-  message.data2 = length > 2 ? bytes[2] : 0;
-
-  OSStatus status =
-      MusicTrackNewMIDIChannelEvent(state->track, beats, &message);
-  if (status != noErr) {
-    log_osstatus_error("MusicTrackNewMIDIChannelEvent", status);
+  switch (result.code) {
+  case MIDI_RESULT_OK:
+    return 1;
+  case MIDI_RESULT_INVALID_ARGUMENT:
+    fputs("invalid recorder input\n", stderr);
     return 0;
-  }
-
-  atomic_fetch_add_explicit(&state->captured_events, 1u, memory_order_relaxed);
-  return 1;
-}
-
-static int add_sysex_event(AppRecorderState *state, const uint8_t *bytes,
-                           size_t length, MusicTimeStamp beats) {
-  if (state == NULL || bytes == NULL || length == 0) {
-    return 0;
-  }
-
-  MIDIRawData *raw = (MIDIRawData *)malloc(sizeof(MIDIRawData) + length - 1);
-  if (raw == NULL) {
+  case MIDI_RESULT_NO_MEMORY:
     fputs("out of memory while recording SysEx\n", stderr);
     return 0;
-  }
-
-  raw->length = (UInt32)length;
-  memcpy(raw->data, bytes, length);
-
-  OSStatus status = MusicTrackNewMIDIRawDataEvent(state->track, beats, raw);
-  free(raw);
-  if (status != noErr) {
-    log_osstatus_error("MusicTrackNewMIDIRawDataEvent", status);
+  case MIDI_RESULT_OSSTATUS:
+    log_osstatus_error(result.operation, result.os_status);
     return 0;
   }
 
-  atomic_fetch_add_explicit(&state->captured_events, 1u, memory_order_relaxed);
-  return 1;
+  return 0;
 }
 
 static void record_packet_bytes(AppRecorderState *state, const uint8_t *bytes,
                                 size_t byte_count, uint64_t host_time) {
+  double elapsed_seconds = 0.0;
+
   if (state == NULL || bytes == NULL || byte_count == 0) {
     return;
   }
@@ -84,57 +54,15 @@ static void record_packet_bytes(AppRecorderState *state, const uint8_t *bytes,
                         AudioConvertHostTimeToNanos(host_time),
                         memory_order_relaxed);
 
-  double elapsed_seconds = 0.0;
   if (host_time >= state->first_host_time) {
     elapsed_seconds = (double)AudioConvertHostTimeToNanos(
                           host_time - state->first_host_time) /
                       1000000000.0;
   }
 
-  MusicTimeStamp beats = 0;
-  OSStatus status =
-      MusicSequenceGetBeatsForSeconds(state->sequence, elapsed_seconds, &beats);
-  if (status != noErr) {
-    log_osstatus_error("MusicSequenceGetBeatsForSeconds", status);
-    return;
-  }
-
-  size_t offset = 0;
-  while (offset < byte_count) {
-    MidiParsedMessage parsed;
-    size_t used = midi_next_stream_message(&state->parser_state, bytes + offset,
-                                           byte_count - offset, &parsed);
-    if (used == 0) {
-      atomic_fetch_add_explicit(&state->ignored_messages, 1u,
-                                memory_order_relaxed);
-      break;
-    }
-
-    switch (parsed.kind) {
-    case MIDI_PARSED_CHANNEL:
-      if (!add_channel_event(state, parsed.channel_bytes, parsed.channel_length,
-                             beats)) {
-        g_stop_requested = 1;
-        return;
-      }
-      break;
-    case MIDI_PARSED_SYSEX:
-      if (!add_sysex_event(state, bytes + offset, parsed.length, beats)) {
-        g_stop_requested = 1;
-        return;
-      }
-      break;
-    case MIDI_PARSED_UNSUPPORTED:
-      atomic_fetch_add_explicit(&state->ignored_messages, 1u,
-                                memory_order_relaxed);
-      break;
-    case MIDI_PARSED_INCOMPLETE:
-      atomic_fetch_add_explicit(&state->ignored_messages, 1u,
-                                memory_order_relaxed);
-      return;
-    }
-
-    offset += used;
+  if (!report_recorder_result(midi_recorder_record_packet_bytes(
+          &state->recorder, bytes, byte_count, elapsed_seconds))) {
+    g_stop_requested = 1;
   }
 }
 
@@ -194,39 +122,22 @@ static int parse_record_request(const char *seconds_arg, const char *source_arg,
 }
 
 static int initialize_record_state(AppRecorderState *state) {
-  OSStatus status;
-
   memset(state, 0, sizeof(*state));
-  midi_parser_state_init(&state->parser_state);
 
-  status = NewMusicSequence(&state->sequence);
-  if (status != noErr) {
-    log_osstatus_error("NewMusicSequence", status);
-    return 0;
-  }
-
-  status = MusicSequenceNewTrack(state->sequence, &state->track);
-  if (status != noErr) {
-    log_osstatus_error("MusicSequenceNewTrack", status);
-    DisposeMusicSequence(state->sequence);
-    state->sequence = NULL;
-    return 0;
-  }
-
-  return 1;
+  return report_recorder_result(midi_recorder_init(&state->recorder));
 }
 
 static void dispose_record_resources(MIDIClientRef client,
                                      MIDIPortRef input_port,
-                                     MusicSequence sequence) {
+                                     AppRecorderState *state) {
   if (input_port != 0) {
     MIDIPortDispose(input_port);
   }
   if (client != 0) {
     MIDIClientDispose(client);
   }
-  if (sequence != NULL) {
-    DisposeMusicSequence(sequence);
+  if (state != NULL) {
+    midi_recorder_dispose(&state->recorder);
   }
 }
 
@@ -299,9 +210,9 @@ static void run_record_loop(AppRecorderState *state, long requested_seconds) {
 static void print_record_summary(const AppRecorderState *state,
                                  const char *output_path) {
   unsigned int captured_events =
-      atomic_load_explicit(&state->captured_events, memory_order_relaxed);
+      midi_recorder_captured_events(&state->recorder);
   unsigned int ignored_messages =
-      atomic_load_explicit(&state->ignored_messages, memory_order_relaxed);
+      midi_recorder_ignored_messages(&state->recorder);
 
   printf("Saved %u event(s) to %s", captured_events, output_path);
   if (ignored_messages > 0) {
@@ -338,7 +249,7 @@ int command_record(const char *output_path, const char *seconds_arg,
   }
 
   if (!open_record_input(source, &state, &client, &input_port)) {
-    dispose_record_resources(client, input_port, state.sequence);
+    dispose_record_resources(client, input_port, &state);
     return 1;
   }
 
@@ -348,14 +259,16 @@ int command_record(const char *output_path, const char *seconds_arg,
   print_record_start(requested_seconds, source_index, source_name);
   run_record_loop(&state, requested_seconds);
 
-  OSStatus status = save_sequence_to_file(state.sequence, output_path);
+  OSStatus status = save_sequence_to_file(
+      midi_recorder_sequence(&state.recorder), output_path);
   putchar('\n');
-  dispose_record_resources(client, input_port, state.sequence);
   if (status != noErr) {
+    dispose_record_resources(client, input_port, &state);
     log_osstatus_error("MusicSequenceFileCreate", status);
     return 1;
   }
 
   print_record_summary(&state, output_path);
+  dispose_record_resources(client, input_port, &state);
   return 0;
 }
