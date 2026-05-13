@@ -1,24 +1,6 @@
 #include "tui_model.h"
 
-#include <ctype.h>
 #include <stdio.h>
-#include <string.h>
-
-int tui_is_midi_filename(const char *name) {
-  size_t length;
-
-  if (name == NULL) {
-    return 0;
-  }
-  length = strlen(name);
-  if (length < 4) {
-    return 0;
-  }
-  return tolower((unsigned char)name[length - 4]) == '.' &&
-         tolower((unsigned char)name[length - 3]) == 'm' &&
-         tolower((unsigned char)name[length - 2]) == 'i' &&
-         tolower((unsigned char)name[length - 1]) == 'd';
-}
 
 int tui_format_recording_name(const struct tm *local_time, char *buffer,
                               size_t buffer_size) {
@@ -27,25 +9,6 @@ int tui_format_recording_name(const struct tm *local_time, char *buffer,
   }
 
   return strftime(buffer, buffer_size, "%Y%m%d%H%M%S.mid", local_time) > 0;
-}
-
-int tui_join_path(char *buffer, size_t buffer_size, const char *directory,
-                  const char *name) {
-  int written;
-
-  if (buffer == NULL || buffer_size == 0 || directory == NULL || name == NULL) {
-    return 0;
-  }
-
-  if (directory[0] == '\0' || strcmp(directory, ".") == 0) {
-    written = snprintf(buffer, buffer_size, "%s", name);
-  } else if (directory[strlen(directory) - 1] == '/') {
-    written = snprintf(buffer, buffer_size, "%s%s", directory, name);
-  } else {
-    written = snprintf(buffer, buffer_size, "%s/%s", directory, name);
-  }
-
-  return written >= 0 && (size_t)written < buffer_size;
 }
 
 void tui_format_midi_bytes(char *buffer, size_t buffer_size,

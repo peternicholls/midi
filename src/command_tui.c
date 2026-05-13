@@ -6,29 +6,26 @@
 #include "midi_parser.h"
 #include "midi_recorder.h"
 #include "midi_sequence.h"
+#include "tui_files.h"
+#include "tui_log.h"
 #include "tui_model.h"
 
 #include <curses.h>
 
-#include <dirent.h>
 #include <errno.h>
 #include <limits.h>
-#include <pthread.h>
 #include <stdarg.h>
 #include <stdatomic.h>
 #include <stdbool.h>
 #include <stdio.h>
 #include <stdlib.h>
 #include <string.h>
-#include <strings.h>
 #include <sys/stat.h>
 #include <time.h>
 #include <unistd.h>
 
 #define TUI_MAX_STATUS 256
 #define TUI_MAX_NAME 256
-#define TUI_MAX_LOG_LINES 128
-#define TUI_MAX_LOG_LINE_LENGTH 160
 #define TUI_INPUT_TIMEOUT_MS 30
 
 typedef enum TuiColorPair {
@@ -42,28 +39,6 @@ typedef enum TuiColorPair {
 } TuiColorPair;
 
 typedef struct TuiApp TuiApp;
-
-typedef struct TuiLogEntry {
-  char line[TUI_MAX_LOG_LINE_LENGTH];
-} TuiLogEntry;
-
-typedef struct TuiLogBuffer {
-  pthread_mutex_t mutex;
-  TuiLogEntry entries[TUI_MAX_LOG_LINES];
-  size_t start;
-  size_t count;
-} TuiLogBuffer;
-
-typedef struct TuiFileEntry {
-  char name[NAME_MAX + 1];
-  char path[PATH_MAX];
-} TuiFileEntry;
-
-typedef struct TuiFileList {
-  TuiFileEntry *items;
-  size_t count;
-  size_t selected;
-} TuiFileList;
 
 typedef struct TuiMonitorSession {
   TuiApp *app;
@@ -116,7 +91,7 @@ typedef struct TuiPlaybackSession {
 
 struct TuiApp {
   TuiFileList files;
-  TuiLogBuffer log;
+  TuiLog *log;
   TuiMonitorSession monitor;
   TuiRecordSession record;
   TuiPlaybackSession playback;
@@ -160,8 +135,6 @@ static void set_status(TuiApp *app, const char *format, ...) {
 }
 
 static void log_line(TuiApp *app, const char *format, ...) {
-  char line[TUI_MAX_LOG_LINE_LENGTH];
-  size_t slot;
   va_list args;
 
   if (app == NULL || format == NULL) {
@@ -169,38 +142,8 @@ static void log_line(TuiApp *app, const char *format, ...) {
   }
 
   va_start(args, format);
-  vsnprintf(line, sizeof(line), format, args);
+  tui_log_vappend(app->log, format, args);
   va_end(args);
-
-  pthread_mutex_lock(&app->log.mutex);
-  slot = (app->log.start + app->log.count) % TUI_MAX_LOG_LINES;
-  if (app->log.count == TUI_MAX_LOG_LINES) {
-    app->log.start = (app->log.start + 1) % TUI_MAX_LOG_LINES;
-    slot = (app->log.start + app->log.count - 1) % TUI_MAX_LOG_LINES;
-  } else {
-    app->log.count += 1;
-  }
-  snprintf(app->log.entries[slot].line, sizeof(app->log.entries[slot].line),
-           "%s", line);
-  pthread_mutex_unlock(&app->log.mutex);
-}
-
-static size_t snapshot_logs(TuiApp *app, TuiLogEntry *out_entries,
-                            size_t capacity) {
-  size_t copied = 0;
-
-  if (app == NULL || out_entries == NULL || capacity == 0) {
-    return 0;
-  }
-
-  pthread_mutex_lock(&app->log.mutex);
-  while (copied < app->log.count && copied < capacity) {
-    size_t index = (app->log.start + copied) % TUI_MAX_LOG_LINES;
-    out_entries[copied] = app->log.entries[index];
-    copied += 1;
-  }
-  pthread_mutex_unlock(&app->log.mutex);
-  return copied;
 }
 
 static void log_midi_bytes(TuiApp *app, const char *label, double seconds,
@@ -452,95 +395,37 @@ static int ensure_directory_exists(const char *path) {
   return mkdir(path, 0755) == 0;
 }
 
-static void free_file_list(TuiFileList *files) {
-  if (files == NULL) {
-    return;
-  }
-  free(files->items);
-  files->items = NULL;
-  files->count = 0;
-  files->selected = 0;
-}
-
-static int compare_file_entries(const void *left, const void *right) {
-  const TuiFileEntry *a = (const TuiFileEntry *)left;
-  const TuiFileEntry *b = (const TuiFileEntry *)right;
-
-  return strcmp(b->name, a->name);
-}
-
 static int scan_recording_files(TuiApp *app) {
-  DIR *directory;
-  struct dirent *entry;
-  TuiFileEntry *items = NULL;
-  size_t count = 0;
-  size_t capacity = 0;
-  char selected_name[NAME_MAX + 1] = "";
+  TuiFileScanResult result;
 
   if (app == NULL) {
     return 0;
   }
 
-  if (app->files.count > 0 && app->files.selected < app->files.count) {
-    snprintf(selected_name, sizeof(selected_name), "%s",
-             app->files.items[app->files.selected].name);
-  }
-
-  directory = opendir(app->recordings_dir);
-  if (directory == NULL) {
-    free_file_list(&app->files);
-    app->last_scan_time = time(NULL);
-    return errno == ENOENT ? 1 : 0;
-  }
-
-  while ((entry = readdir(directory)) != NULL) {
-    if (!tui_is_midi_filename(entry->d_name)) {
-      continue;
-    }
-
-    if (count == capacity) {
-      size_t new_capacity = capacity == 0 ? 16 : capacity * 2;
-      TuiFileEntry *resized =
-          (TuiFileEntry *)realloc(items, new_capacity * sizeof(*resized));
-      if (resized == NULL) {
-        closedir(directory);
-        free(items);
-        set_status(app, "Out of memory while scanning %s", app->recordings_dir);
-        return 0;
-      }
-      items = resized;
-      capacity = new_capacity;
-    }
-
-    memset(&items[count], 0, sizeof(items[count]));
-    snprintf(items[count].name, sizeof(items[count].name), "%s", entry->d_name);
-    tui_join_path(items[count].path, sizeof(items[count].path),
-                  app->recordings_dir, entry->d_name);
-    count += 1;
-  }
-
-  closedir(directory);
-
-  if (count > 1) {
-    qsort(items, count, sizeof(items[0]), compare_file_entries);
-  }
-
-  free(app->files.items);
-  app->files.items = items;
-  app->files.count = count;
-  app->files.selected = 0;
+  result = tui_file_list_scan(&app->files, app->recordings_dir);
   app->last_scan_time = time(NULL);
-
-  if (selected_name[0] != '\0') {
-    for (size_t i = 0; i < count; ++i) {
-      if (strcmp(app->files.items[i].name, selected_name) == 0) {
-        app->files.selected = i;
-        break;
-      }
-    }
+  if (tui_file_scan_result_is_ok(result)) {
+    return 1;
   }
 
-  return 1;
+  switch (result.code) {
+  case TUI_FILE_SCAN_INVALID_ARGUMENT:
+    set_status(app, "Could not scan recordings: invalid argument");
+    break;
+  case TUI_FILE_SCAN_NO_MEMORY:
+    set_status(app, "Out of memory while scanning %s", app->recordings_dir);
+    break;
+  case TUI_FILE_SCAN_OPEN_FAILED:
+    set_status(app, "Could not scan %s: %s", app->recordings_dir,
+               strerror(result.system_error));
+    break;
+  case TUI_FILE_SCAN_PATH_TOO_LONG:
+    set_status(app, "Recording path is too long in %s", app->recordings_dir);
+    break;
+  case TUI_FILE_SCAN_OK:
+    break;
+  }
+  return 0;
 }
 
 static void playback_reset_runtime(TuiPlaybackSession *playback) {
@@ -576,24 +461,25 @@ static void playback_clear_loaded(TuiPlaybackSession *playback) {
 
 static int playback_load_selected_file(TuiApp *app) {
   MidiSequenceEventList events;
+  const TuiFileEntry *selected_file;
   double total_seconds = 0.0;
   MidiResult result;
 
   midi_sequence_event_list_init(&events);
+  selected_file = tui_file_list_selected(&app->files);
 
-  if (app->files.count == 0 || app->files.selected >= app->files.count) {
+  if (selected_file == NULL) {
     playback_clear_loaded(&app->playback);
     return 1;
   }
 
   if (app->playback.loaded &&
-      strcmp(app->playback.loaded_path,
-             app->files.items[app->files.selected].path) == 0) {
+      strcmp(app->playback.loaded_path, selected_file->path) == 0) {
     return 1;
   }
 
-  result = midi_sequence_load_events_from_file(
-      app->files.items[app->files.selected].path, &events, &total_seconds);
+  result = midi_sequence_load_events_from_file(selected_file->path, &events,
+                                               &total_seconds);
   if (!midi_result_is_ok(result)) {
     midi_sequence_event_list_free(&events);
     set_midi_result_error(app, result);
@@ -607,9 +493,9 @@ static int playback_load_selected_file(TuiApp *app) {
   app->playback.selected_event = 0;
   app->playback.current_index = 0;
   snprintf(app->playback.loaded_path, sizeof(app->playback.loaded_path), "%s",
-           app->files.items[app->files.selected].path);
+           selected_file->path);
   snprintf(app->playback.loaded_name, sizeof(app->playback.loaded_name), "%s",
-           app->files.items[app->files.selected].name);
+           selected_file->name);
   set_status(app, "Loaded %s with %zu event(s)", app->playback.loaded_name,
              app->playback.events.count);
   return 1;
@@ -1179,8 +1065,7 @@ static void draw_events_panel(TuiApp *app, int top, int left, int width,
                           app->playback.events.items[index].data,
                           app->playback.events.items[index].length);
     midi_describe_bytes(app->playback.events.items[index].data,
-                        app->playback.events.items[index].length,
-                        &description);
+                        app->playback.events.items[index].length, &description);
     snprintf(line, sizeof(line), "%c %4zu  %s  %-12s  %s",
              index == app->playback.selected_event ? '>' : ' ', index + 1,
              clock_text, byte_text, description.text);
@@ -1197,8 +1082,8 @@ static void draw_events_panel(TuiApp *app, int top, int left, int width,
 
 static void draw_log_panel(TuiApp *app, int top, int left, int width,
                            int height) {
-  TuiLogEntry snapshot[TUI_MAX_LOG_LINES];
-  size_t count = snapshot_logs(app, snapshot, TUI_MAX_LOG_LINES);
+  TuiLogEntry snapshot[TUI_LOG_CAPACITY];
+  size_t count = tui_log_snapshot(app->log, snapshot, TUI_LOG_CAPACITY);
   int visible = height - 2;
   size_t start = 0;
 
@@ -1423,9 +1308,11 @@ static void handle_keypress(TuiApp *app, int ch, bool *should_quit) {
 
 static int initialize_tui(TuiApp *app, const char *recordings_dir) {
   memset(app, 0, sizeof(*app));
+  tui_file_list_init(&app->files);
   snprintf(app->recordings_dir, sizeof(app->recordings_dir), "%s",
            recordings_dir != NULL ? recordings_dir : ".");
-  if (pthread_mutex_init(&app->log.mutex, NULL) != 0) {
+  app->log = tui_log_create();
+  if (app->log == NULL) {
     fputs("could not initialize TUI log mutex\n", stderr);
     return 0;
   }
@@ -1437,7 +1324,8 @@ static int initialize_tui(TuiApp *app, const char *recordings_dir) {
   midi_output_init(&app->playback.output);
   set_status(app, "Ready");
   if (!ensure_directory_exists(app->recordings_dir)) {
-    pthread_mutex_destroy(&app->log.mutex);
+    tui_log_destroy(app->log);
+    app->log = NULL;
     fputs("could not access recordings directory\n", stderr);
     return 0;
   }
@@ -1456,8 +1344,9 @@ static void dispose_tui(TuiApp *app) {
   }
   dispose_monitor_input(&app->monitor);
   playback_clear_loaded(&app->playback);
-  free_file_list(&app->files);
-  pthread_mutex_destroy(&app->log.mutex);
+  tui_file_list_dispose(&app->files);
+  tui_log_destroy(app->log);
+  app->log = NULL;
 }
 
 int command_tui(const char *recordings_dir) {
