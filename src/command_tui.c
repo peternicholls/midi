@@ -1,6 +1,7 @@
 #include "command_tui.h"
 
 #include "app_support.h"
+#include "midi_describe.h"
 #include "midi_output.h"
 #include "midi_parser.h"
 #include "midi_recorder.h"
@@ -29,6 +30,16 @@
 #define TUI_MAX_LOG_LINES 128
 #define TUI_MAX_LOG_LINE_LENGTH 160
 #define TUI_INPUT_TIMEOUT_MS 30
+
+typedef enum TuiColorPair {
+  TUI_COLOR_NOTE_ON = 1,
+  TUI_COLOR_NOTE_OFF = 2,
+  TUI_COLOR_CONTROL = 3,
+  TUI_COLOR_PROGRAM = 4,
+  TUI_COLOR_BEND = 5,
+  TUI_COLOR_SYSTEM = 6,
+  TUI_COLOR_WARNING = 7
+} TuiColorPair;
 
 typedef struct TuiApp TuiApp;
 
@@ -196,10 +207,13 @@ static void log_midi_bytes(TuiApp *app, const char *label, double seconds,
                            const uint8_t *bytes, size_t length) {
   char clock_text[32];
   char byte_text[64];
+  MidiDescription description;
 
   tui_format_clock_time(clock_text, sizeof(clock_text), seconds);
   tui_format_midi_bytes(byte_text, sizeof(byte_text), bytes, length);
-  log_line(app, "%s %s  %s", clock_text, label, byte_text);
+  midi_describe_bytes(bytes, length, &description);
+  log_line(app, "%s %s  %s  %s", clock_text, label, byte_text,
+           description.text);
 }
 
 static void dispose_monitor_input(TuiMonitorSession *monitor) {
@@ -1018,6 +1032,34 @@ static void draw_clipped_text(int row, int col, int width, const char *text,
   attroff(attr);
 }
 
+static int category_attrs(MidiDescriptionCategory category) {
+  if (!has_colors()) {
+    return 0;
+  }
+
+  switch (category) {
+  case MIDI_DESCRIPTION_NOTE_ON:
+    return COLOR_PAIR(TUI_COLOR_NOTE_ON);
+  case MIDI_DESCRIPTION_NOTE_OFF:
+    return COLOR_PAIR(TUI_COLOR_NOTE_OFF);
+  case MIDI_DESCRIPTION_CONTROL_CHANGE:
+    return COLOR_PAIR(TUI_COLOR_CONTROL);
+  case MIDI_DESCRIPTION_PROGRAM_CHANGE:
+  case MIDI_DESCRIPTION_CHANNEL_PRESSURE:
+  case MIDI_DESCRIPTION_POLY_PRESSURE:
+    return COLOR_PAIR(TUI_COLOR_PROGRAM);
+  case MIDI_DESCRIPTION_PITCH_BEND:
+    return COLOR_PAIR(TUI_COLOR_BEND);
+  case MIDI_DESCRIPTION_SYSEX:
+    return COLOR_PAIR(TUI_COLOR_SYSTEM);
+  case MIDI_DESCRIPTION_UNSUPPORTED:
+  case MIDI_DESCRIPTION_INCOMPLETE:
+    return COLOR_PAIR(TUI_COLOR_WARNING);
+  }
+
+  return 0;
+}
+
 static void draw_header(TuiApp *app, int cols) {
   char source_label[TUI_MAX_STATUS];
   char destination_label[TUI_MAX_STATUS];
@@ -1121,7 +1163,9 @@ static void draw_events_panel(TuiApp *app, int top, int left, int width,
     int screen_row = top + 2 + row;
     char clock_text[32];
     char byte_text[64];
-    char line[128];
+    char line[160];
+    MidiDescription description;
+    int attrs;
 
     move(screen_row, left + 1);
     clrtoeol();
@@ -1134,17 +1178,20 @@ static void draw_events_panel(TuiApp *app, int top, int left, int width,
     tui_format_midi_bytes(byte_text, sizeof(byte_text),
                           app->playback.events.items[index].data,
                           app->playback.events.items[index].length);
-    snprintf(line, sizeof(line), "%c %4zu  %s  %s",
+    midi_describe_bytes(app->playback.events.items[index].data,
+                        app->playback.events.items[index].length,
+                        &description);
+    snprintf(line, sizeof(line), "%c %4zu  %s  %-12s  %s",
              index == app->playback.selected_event ? '>' : ' ', index + 1,
-             clock_text, byte_text);
+             clock_text, byte_text, description.text);
 
+    attrs = category_attrs(description.category);
     if (index == app->playback.selected_event) {
-      attron(A_REVERSE);
+      attrs |= A_REVERSE;
     }
+    attron(attrs);
     mvaddnstr(screen_row, left + 1, line, width - 2);
-    if (index == app->playback.selected_event) {
-      attroff(A_REVERSE);
-    }
+    attroff(attrs);
   }
 }
 
@@ -1433,6 +1480,13 @@ int command_tui(const char *recordings_dir) {
   if (has_colors()) {
     start_color();
     use_default_colors();
+    init_pair(TUI_COLOR_NOTE_ON, COLOR_GREEN, -1);
+    init_pair(TUI_COLOR_NOTE_OFF, COLOR_CYAN, -1);
+    init_pair(TUI_COLOR_CONTROL, COLOR_YELLOW, -1);
+    init_pair(TUI_COLOR_PROGRAM, COLOR_MAGENTA, -1);
+    init_pair(TUI_COLOR_BEND, COLOR_BLUE, -1);
+    init_pair(TUI_COLOR_SYSTEM, COLOR_WHITE, -1);
+    init_pair(TUI_COLOR_WARNING, COLOR_RED, -1);
   }
 
   while (!should_quit && !g_stop_requested) {
