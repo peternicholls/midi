@@ -21,6 +21,7 @@ Static HTML/CSS mockups live alongside this plan:
 - [`phase-08-mockups-gemini/index.html`](phase-08-mockups-gemini/index.html)
 - [`phase-08-mockups-v2/index.html`](phase-08-mockups-v2/index.html)
 - [`phase-08-mockups-v3/index.html`](phase-08-mockups-v3/index.html)
+- Formal execution breakdown: [`phase-08-delivery-plan.md`](phase-08-delivery-plan.md)
 
 Treat them as visual direction, not an implementation constraint: the curses
 implementation should preserve the layout, hierarchy, and semantic color intent
