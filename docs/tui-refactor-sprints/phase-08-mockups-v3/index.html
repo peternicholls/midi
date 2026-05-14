@@ -1,0 +1,326 @@
+<!doctype html>
+<html lang="en">
+  <head>
+    <meta charset="utf-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1">
+    <title>Phase 8 TUI Mockups V3</title>
+    <link rel="icon" href="data:,">
+    <link rel="stylesheet" href="styles.css">
+  </head>
+  <body>
+    <header class="page-header">
+      <p class="eyebrow">MIDI Capture TUI - Phase 8 V3</p>
+      <h1>Two-pane Signal Desk</h1>
+      <p>
+        V3 keeps the V1 palette and utility density, then folds in the
+        two-pane mode model: Sequence, Live Player, and Live Diagnostic.
+      </p>
+    </header>
+
+    <main>
+      <section>
+        <h2>Mode contract</h2>
+        <div class="mode-grid">
+          <article>
+            <h3>Sequence</h3>
+            <p>Selected file view. Structured MIDI columns plus raw bytes for inspection.</p>
+          </article>
+          <article>
+            <h3>Live Player</h3>
+            <p>Performance view. Normal-height rows with note, state, velocity, pressure, bend/mod, and age.</p>
+          </article>
+          <article>
+            <h3>Live Diagnostic</h3>
+            <p>Debug view. Full stream table for time, direction, event, values, bytes, and readable meaning.</p>
+          </article>
+        </div>
+      </section>
+
+      <section>
+        <h2>Sequence mode</h2>
+        <div class="terminal">
+          <div class="rail">
+            <span class="brand">MIDI Capture</span>
+            <span class="mode">SEQUENCE</span>
+            <span class="rx idle">RX.</span>
+            <span class="tx active">TX*</span>
+            <span class="endpoint">SRC [0] KeyLab 88</span>
+            <span class="endpoint">DST [0] IAC Driver Bus 1</span>
+            <span class="version">v0.8.0</span>
+          </div>
+          <div class="keybar">
+            <kbd>tab</kbd><span>pane</span><kbd>enter</kbd><span>load</span><kbd>space</kbd><span>play/stop</span><kbd>0</kbd><span>start</span><kbd>,</kbd><span>settings</span><kbd>d</kbd><span>directory</span>
+          </div>
+          <div class="body">
+            <aside class="files">
+              <div class="title">Files</div>
+              <div class="path">/Users/peter/music/midi/takes</div>
+              <div class="file selected">20260514000738.mid</div>
+              <div class="file">20260514000716.mid</div>
+              <div class="file">20260512040548.mid</div>
+              <div class="file">bassline-sketch.mid</div>
+              <div class="file">filter-sweep.mid</div>
+              <div class="file">poly-aftertouch-test.mid</div>
+              <div class="file muted">diagnostic-capture.mid</div>
+            </aside>
+            <section class="pane">
+              <div class="title split">
+                <span>Sequence - 20260514000738.mid</span>
+                <span>128 events</span>
+              </div>
+              <div class="seq grid header">
+                <span></span><span>#/</span><span>time</span><span>ch</span><span>event</span><span>target</span><span>value</span><span>raw</span>
+              </div>
+              <div class="seq grid row note-on current">
+                <span>&gt;</span><span>21/128</span><span>00:03.4</span><span>1</span><span>Note On</span><span>E1</span><span><i class="bar" style="--value: 65%"></i>vel 65</span><span>90 28 41</span>
+              </div>
+              <div class="seq grid row control">
+                <span></span><span>22/128</span><span>00:03.5</span><span>1</span><span>CC 1</span><span>Mod</span><span><i class="bar green" style="--value: 42%"></i>42</span><span>B0 01 2A</span>
+              </div>
+              <div class="seq grid row pressure">
+                <span></span><span>23/128</span><span>00:03.7</span><span>1</span><span>Ch Pressure</span><span>Channel</span><span><i class="bar amber" style="--value: 41%"></i>41</span><span>D0 29</span>
+              </div>
+              <div class="seq grid row bend">
+                <span></span><span>24/128</span><span>00:04.0</span><span>1</span><span>Pitch Bend</span><span>Bend</span><span>+530</span><span>E0 12 42</span>
+              </div>
+              <div class="seq grid row note-off">
+                <span></span><span>25/128</span><span>00:04.2</span><span>1</span><span>Note Off</span><span>E1</span><span>rel 0</span><span>80 28 00</span>
+              </div>
+              <div class="seq grid row sysex">
+                <span></span><span>26/128</span><span>00:04.9</span><span>-</span><span>SysEx</span><span>Device</span><span>6 bytes</span><span>F0 7E 7F...</span>
+              </div>
+            </section>
+          </div>
+          <footer>
+            <span>Loaded 20260514000738.mid with 128 events</span>
+            <span>tempo 120 BPM  playhead 00:03.4 / 12.8s</span>
+          </footer>
+        </div>
+      </section>
+
+      <section>
+        <h2>Live Player mode</h2>
+        <div class="terminal">
+          <div class="rail">
+            <span class="brand">MIDI Capture</span>
+            <span class="mode live">LIVE PLAYER</span>
+            <span class="rx active">RX*</span>
+            <span class="tx idle">TX.</span>
+            <span class="endpoint">SRC [0] KeyLab 88</span>
+            <span class="endpoint">CH 1</span>
+            <span class="version">v0.8.0</span>
+          </div>
+          <div class="keybar">
+            <kbd>tab</kbd><span>pane</span><kbd>space</kbd><span>hold</span><kbd>c</kbd><span>channel</span><kbd>,</kbd><span>settings</span><kbd>d</kbd><span>directory</span><kbd>q</kbd><span>quit</span>
+          </div>
+          <div class="body">
+            <aside class="files">
+              <div class="title">Files</div>
+              <div class="path">/Users/peter/music/midi/takes</div>
+              <div class="file selected">20260514000738.mid</div>
+              <div class="file">20260514000716.mid</div>
+              <div class="file">20260512040548.mid</div>
+              <div class="file">bassline-sketch.mid</div>
+              <div class="file">filter-sweep.mid</div>
+              <div class="file muted">Live Player ignores file selection</div>
+            </aside>
+            <section class="pane">
+              <div class="title split">
+                <span>Live Player - KeyLab 88</span>
+                <span>released notes fade 2.5s</span>
+              </div>
+              <div class="controls grid header">
+                <span>scope</span><span>mod</span><span>pressure</span><span>pitch</span><span>last</span>
+              </div>
+              <div class="controls grid row">
+                <span>CH 1</span>
+                <span><i class="bar green" style="--value: 37%"></i>37</span>
+                <span><i class="bar amber" style="--value: 41%"></i>41</span>
+                <span><i class="bendbar" style="--value: 58%"></i>+530</span>
+                <span>RX 18ms</span>
+              </div>
+              <div class="player grid header">
+                <span>#/</span><span>note</span><span>state</span><span>velocity</span><span>pressure</span><span>bend/mod</span><span>age</span>
+              </div>
+              <div class="player grid row note-on">
+                <span>1/5</span><span>E1</span><span>ON</span><span><i class="bar" style="--value: 65%"></i>65</span><span><i class="bar amber" style="--value: 41%"></i>41</span><span>mod 37</span><span>18ms</span>
+              </div>
+              <div class="player grid row note-on">
+                <span>2/5</span><span>G1</span><span>ON</span><span><i class="bar" style="--value: 51%"></i>51</span><span>-</span><span>mod 37</span><span>42ms</span>
+              </div>
+              <div class="player grid row pressure">
+                <span>3/5</span><span>A1</span><span>ON</span><span><i class="bar" style="--value: 8%"></i>8</span><span><i class="bar amber" style="--value: 34%"></i>34</span><span>bend +530</span><span>73ms</span>
+              </div>
+              <div class="player grid row released">
+                <span>4/5</span><span>C2</span><span>OFF</span><span><i class="bar" style="--value: 53%"></i>53</span><span>-</span><span>fading</span><span>1.1s</span>
+              </div>
+              <div class="player grid row ghost">
+                <span>5/5</span><span>E2</span><span>OFF</span><span><i class="bar" style="--value: 53%"></i>53</span><span>-</span><span>fade out</span><span>2.3s</span>
+              </div>
+            </section>
+          </div>
+          <footer>
+            <span>Live Player: CH 1, 3 active notes, 2 fading notes</span>
+            <span>middle C C4  note format names  fade timeout 2.5s</span>
+          </footer>
+        </div>
+      </section>
+
+      <section>
+        <h2>Live Diagnostic mode</h2>
+        <div class="terminal">
+          <div class="rail">
+            <span class="brand">MIDI Capture</span>
+            <span class="mode diagnostic">LIVE DIAGNOSTIC</span>
+            <span class="rx active">RX*</span>
+            <span class="tx active">TX*</span>
+            <span class="endpoint">SRC [0] KeyLab 88</span>
+            <span class="endpoint">DST [0] IAC Driver Bus 1</span>
+            <span class="version">v0.8.0</span>
+          </div>
+          <div class="keybar">
+            <kbd>tab</kbd><span>pane</span><kbd>f</kbd><span>filter</span><kbd>space</kbd><span>pause log</span><kbd>,</kbd><span>settings</span><kbd>d</kbd><span>directory</span>
+          </div>
+          <div class="body">
+            <aside class="files">
+              <div class="title">Files</div>
+              <div class="path">/Users/peter/music/midi/takes</div>
+              <div class="file selected">20260514000738.mid</div>
+              <div class="file">20260514000716.mid</div>
+              <div class="file">poly-aftertouch-test.mid</div>
+              <div class="file">diagnostic-capture.mid</div>
+              <div class="file muted">Diagnostic stream continues live</div>
+            </aside>
+            <section class="pane">
+              <div class="title split">
+                <span>Live Diagnostic</span>
+                <span>last 128 messages</span>
+              </div>
+              <div class="diag grid header">
+                <span>time</span><span>dir</span><span>ch</span><span>event</span><span>target</span><span>value</span><span>raw</span><span>description</span>
+              </div>
+              <div class="diag grid row note-on">
+                <span>00:04.21</span><span>RX</span><span>1</span><span>Note On</span><span>E1</span><span>vel 65</span><span>90 28 41</span><span>Note On E1 velocity 65 channel 1</span>
+              </div>
+              <div class="diag grid row control">
+                <span>00:04.23</span><span>RX</span><span>1</span><span>CC 1</span><span>Mod</span><span><i class="bar green" style="--value: 37%"></i>37</span><span>B0 01 25</span><span>Modulation wheel value 37</span>
+              </div>
+              <div class="diag grid row pressure">
+                <span>00:04.26</span><span>RX</span><span>1</span><span>Ch Press</span><span>Channel</span><span><i class="bar amber" style="--value: 41%"></i>41</span><span>D0 29</span><span>Channel pressure 41</span>
+              </div>
+              <div class="diag grid row bend">
+                <span>00:04.29</span><span>RX</span><span>1</span><span>Pitch Bend</span><span>Bend</span><span>+530</span><span>E0 12 42</span><span>Pitch bend above center</span>
+              </div>
+              <div class="diag grid row note-off">
+                <span>00:04.66</span><span>RX</span><span>1</span><span>Note Off</span><span>E1</span><span>rel 0</span><span>80 28 00</span><span>Note Off E1 channel 1</span>
+              </div>
+              <div class="diag grid row warning">
+                <span>00:05.10</span><span>SKIP</span><span>-</span><span>Clock</span><span>System</span><span>ignored</span><span>F8</span><span>Unsupported realtime clock message</span>
+              </div>
+            </section>
+          </div>
+          <footer>
+            <span>Live Diagnostic: last 128 messages, raw bytes visible</span>
+            <span>filters off  capture paused no</span>
+          </footer>
+        </div>
+      </section>
+
+      <section>
+        <h2>Settings popover</h2>
+        <div class="terminal overlay-demo">
+          <div class="rail">
+            <span class="brand">MIDI Capture</span>
+            <span class="mode">SEQUENCE</span>
+            <span class="rx idle">RX.</span>
+            <span class="tx idle">TX.</span>
+            <span class="endpoint">SRC [0] KeyLab 88</span>
+            <span class="version">v0.8.0</span>
+          </div>
+          <div class="keybar">
+            <kbd>up/down</kbd><span>setting</span><kbd>left/right</kbd><span>value</span><kbd>enter</kbd><span>apply</span><kbd>esc</kbd><span>cancel</span>
+          </div>
+          <div class="body dimmed">
+            <aside class="files">
+              <div class="title">Files</div>
+              <div class="file selected">20260514000738.mid</div>
+              <div class="file">20260514000716.mid</div>
+            </aside>
+            <section class="pane">
+              <div class="title">Sequence - 20260514000738.mid</div>
+            </section>
+          </div>
+          <div class="popover">
+            <div class="popover-title">Settings</div>
+            <div class="settings grid header">
+              <span>setting</span><span>value</span><span>notes</span>
+            </div>
+            <div class="settings grid row selected-row">
+              <span>Recordings directory</span><span>/Users/peter/music/midi/takes</span><span>press d for browser</span>
+            </div>
+            <div class="settings grid row">
+              <span>Middle C</span><span>C4</span><span>C3/C4/C5 naming preference</span>
+            </div>
+            <div class="settings grid row">
+              <span>Note format</span><span>name</span><span>name / number / hex</span>
+            </div>
+            <div class="settings grid row">
+              <span>Fade timeout</span><span>2s</span><span>2 / 5 / 10 / never</span>
+            </div>
+            <div class="settings grid row">
+              <span>Tempo</span><span>120 BPM</span><span>playback speed reference</span>
+            </div>
+            <div class="settings grid row">
+              <span>Metronome</span><span>off</span><span>recording click, single tone</span>
+            </div>
+          </div>
+        </div>
+      </section>
+
+      <section>
+        <h2>Directory browser</h2>
+        <div class="terminal">
+          <div class="rail">
+            <span class="brand">MIDI Capture</span>
+            <span class="mode diagnostic">DIRECTORY</span>
+            <span class="endpoint">Choose recordings directory</span>
+            <span class="version">v0.8.0</span>
+          </div>
+          <div class="keybar">
+            <kbd>tab</kbd><span>column</span><kbd>arrows</kbd><span>move</span><kbd>enter</kbd><span>open/apply</span><kbd>esc</kbd><span>cancel</span>
+          </div>
+          <div class="columns">
+            <div class="dircol">
+              <div class="title">/Users</div>
+              <div class="file selected">peter</div>
+              <div class="file">Shared</div>
+            </div>
+            <div class="dircol">
+              <div class="title">peter</div>
+              <div class="file">Desktop</div>
+              <div class="file">Documents</div>
+              <div class="file selected">music</div>
+              <div class="file">Downloads</div>
+            </div>
+            <div class="dircol">
+              <div class="title">music</div>
+              <div class="file">audio</div>
+              <div class="file selected">midi</div>
+              <div class="file">samples</div>
+            </div>
+            <div class="dircol">
+              <div class="title">midi</div>
+              <div class="file selected">takes</div>
+              <div class="file">exports</div>
+              <div class="file">archive</div>
+            </div>
+          </div>
+          <footer>
+            <span>Selected /Users/peter/music/midi/takes</span>
+            <span>enter apply  n new folder  / manual path  esc cancel</span>
+          </footer>
+        </div>
+      </section>
+    </main>
+  </body>
+</html>

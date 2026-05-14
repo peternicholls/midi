@@ -1,0 +1,170 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+<meta charset="UTF-8">
+<meta name="viewport" content="width=device-width, initial-scale=1.0">
+<title>MIDI Capture TUI Mockup</title>
+<style>
+  html, body {
+    background-color: #121212;
+    color: #cccccc;
+    font-family: ui-monospace, 'Cascadia Code', 'Source Code Pro', Menlo, Consolas, 'Courier New', monospace;
+    font-size: 14px;
+    line-height: 1.2;
+    padding: 20px;
+  }
+  .terminal {
+    background-color: #000000;
+    border: 1px solid #444444;
+    width: 90ch; /* Minimum supported size */
+    margin: 0 auto;
+    padding: 10px;
+    display: flex;
+    flex-direction: column;
+    box-shadow: 0 10px 30px rgba(0,0,0,0.8);
+  }
+  /* Color Palette based on ANSI */
+  .bold { font-weight: bold; }
+  .dim { color: #666666; }
+  .green { color: #4af626; } /* Note On */
+  .cyan { color: #00ffff; }  /* Note Off */
+  .yellow { color: #ffeb3b; } /* Control/Program */
+  .magenta { color: #ff00ff; } /* Pitch Bend/System */
+  .blue { color: #64b5f6; } /* SysEx */
+  .red { color: #f44336; } /* Error/Unsupported */
+  .reverse { background-color: #cccccc; color: #000000; }
+  .rx { color: #ff9800; font-weight: bold; }
+  .tx { color: #4af626; font-weight: bold; }
+  
+  /* Layout */
+  .divider-h { border-bottom: 1px dashed #444; margin: 5px 0; }
+  .header { display: flex; justify-content: space-between; padding-bottom: 5px; }
+  .instructions { display: flex; justify-content: space-between; }
+  
+  .middle { display: flex; height: 16lh; }
+  .sidebar { width: 30ch; padding-right: 1ch; border-right: 1px dashed #444; overflow: hidden; }
+  .sequence { flex-grow: 1; padding-left: 2ch; overflow: hidden; }
+  
+  /* Table layout for Sequence */
+  .seq-row { display: flex; margin-bottom: 2px; }
+  .seq-time { width: 9ch; text-align: right; margin-right: 1ch; }
+  .seq-dir { width: 4ch; text-align: center; }
+  .seq-bytes { width: 11ch; letter-spacing: 1px; }
+  .seq-desc { flex-grow: 1; overflow: hidden; text-overflow: ellipsis; white-space: nowrap; }
+
+  /* Stream  */
+  .stream { height: 8lh; margin-top: 5px; padding-top: 5px; }
+  
+  /* Footer */
+  .footer { margin-top: 5px; padding-top: 5px; }
+</style>
+</head>
+<body>
+
+<div class="terminal">
+  <!-- HEADER -->
+  <div class="header bold">
+    <div>MIDI Capture UI</div>
+    <div>[<span class="red">⏺ REC</span>] [<span class="green">▶ PLAY</span>]</div>
+  </div>
+  <div>Recordings: /Users/peternicholls/code/midi/recordings/</div>
+  <div class="instructions dim">
+    <div>SRC: Akai MPK Mini</div>
+    <div>DST: IAC Driver Bus 1</div>
+  </div>
+  <div class="instructions dim">
+    <div>[r] record  [p] play  [↑/↓] navigate  [q] quit</div>
+  </div>
+  <div class="divider-h"></div>
+
+  <!-- MIDDLE SECTION -->
+  <div class="middle">
+    <!-- FILES (Sidebar) -->
+    <div class="sidebar">
+      <div class="bold" style="margin-bottom: 5px;">Files</div>
+      <div>20260514000716.mid</div>
+      <div class="reverse">20260514000738.mid</div>
+      <div>20260512040548.mid</div>
+    </div>
+    
+    <!-- SEQUENCE (Main) -->
+    <div class="sequence">
+      <div class="seq-row dim bold" style="margin-bottom: 5px;">
+        <div class="seq-time">Time</div>
+        <div class="seq-dir">Dir</div>
+        <div class="seq-bytes">Bytes</div>
+        <div class="seq-desc">Description</div>
+      </div>
+      <!-- Example rows -->
+      <div class="seq-row">
+        <div class="seq-time dim">  0.000</div>
+        <div class="seq-dir tx">TX</div>
+        <div class="seq-bytes dim">90 3C 64</div>
+        <div class="seq-desc green">Note On: C4, Vel 100</div>
+      </div>
+      <div class="seq-row">
+        <div class="seq-time dim">  0.250</div>
+        <div class="seq-dir tx">TX</div>
+        <div class="seq-bytes dim">80 3C 00</div>
+        <div class="seq-desc cyan">Note Off: C4</div>
+      </div>
+      <div class="seq-row">
+        <div class="seq-time dim">  0.255</div>
+        <div class="seq-dir tx">TX</div>
+        <div class="seq-bytes dim">B0 0A 40</div>
+        <div class="seq-desc yellow">Control: Pan, Val 64</div>
+      </div>
+      <div class="seq-row reverse">
+        <div class="seq-time dim">  0.500</div>
+        <div class="seq-dir tx">TX</div>
+        <div class="seq-bytes dim">C0 05   </div>
+        <div class="seq-desc yellow">Program: 5 (Elec Piano)</div>
+      </div>
+      <div class="seq-row">
+        <div class="seq-time dim">  0.600</div>
+        <div class="seq-dir tx">TX</div>
+        <div class="seq-bytes dim">E0 00 40</div>
+        <div class="seq-desc magenta">Pitch Bend: 8192 (Center)</div>
+      </div>
+      <div class="seq-row">
+        <div class="seq-time dim">  1.000</div>
+        <div class="seq-dir tx">TX</div>
+        <div class="seq-bytes dim">F0 05...</div>
+        <div class="seq-desc blue">SysEx Data</div>
+      </div>
+      <div class="seq-row">
+        <div class="seq-time dim">  1.200</div>
+        <div class="seq-dir tx">TX</div>
+        <div class="seq-bytes dim">F9      </div>
+        <div class="seq-desc red">Unsupported: Undefined</div>
+      </div>
+    </div>
+  </div>
+
+  <div class="divider-h"></div>
+  
+  <!-- BOTTOM SECTION -->
+  <div class="stream">
+    <div class="bold" style="margin-bottom: 5px;">Live Stream</div>
+    <div class="seq-row">
+      <div class="seq-time dim">14:02:11</div>
+      <div class="seq-dir rx">RX</div>
+      <div class="seq-bytes dim">90 2A 7F</div>
+      <div class="seq-desc green">Note On: F#2, Vel 127</div>
+    </div>
+    <div class="seq-row">
+      <div class="seq-time dim">14:02:11</div>
+      <div class="seq-dir rx">RX</div>
+      <div class="seq-bytes dim">80 2A 00</div>
+      <div class="seq-desc cyan">Note Off: F#2</div>
+    </div>
+  </div>
+
+  <div class="divider-h"></div>
+  <div class="footer dim">
+    > Ready. Selected recording 20260514000738.mid (86 events)
+  </div>
+
+</div>
+</body>
+</html>

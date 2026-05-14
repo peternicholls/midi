@@ -1,0 +1,251 @@
+<!doctype html>
+<html lang="en">
+  <head>
+    <meta charset="utf-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1">
+    <title>Phase 8 TUI Visual UX Mockups</title>
+    <link rel="icon" href="data:,">
+    <link rel="stylesheet" href="styles.css">
+  </head>
+  <body>
+    <header class="page-header">
+      <p class="eyebrow">MIDI Capture TUI - Phase 8</p>
+      <h1>Signal Desk mockups</h1>
+      <p>
+        Static HTML/CSS studies for the curses redesign. The real TUI should
+        keep ASCII-safe labels and conservative terminal color fallbacks.
+      </p>
+    </header>
+
+    <main>
+      <section class="direction">
+        <h2>Design direction</h2>
+        <div class="direction-grid">
+          <article>
+            <h3>Signal Desk</h3>
+            <p>
+              Recommended. A compact studio utility: persistent files, aligned
+              MIDI tables, a taller live monitor, and semantic color.
+            </p>
+          </article>
+          <article>
+            <h3>Timeline Console</h3>
+            <p>
+              Strong for file inspection, but less balanced for live monitoring
+              because the side browser becomes secondary.
+            </p>
+          </article>
+          <article>
+            <h3>Performance HUD</h3>
+            <p>
+              Big transport status and meters. Useful live, but too spacious
+              for this dense MIDI capture workflow.
+            </p>
+          </article>
+        </div>
+      </section>
+
+      <section>
+        <h2>Palette</h2>
+        <div class="palette">
+          <span class="swatch note-on">Note on</span>
+          <span class="swatch note-off">Note off</span>
+          <span class="swatch control">Control</span>
+          <span class="swatch program">Program</span>
+          <span class="swatch bend">Pitch bend</span>
+          <span class="swatch sysex">SysEx</span>
+          <span class="swatch warning">Unsupported</span>
+          <span class="swatch selected">Selected</span>
+          <span class="swatch recording">Recording</span>
+          <span class="swatch playback">Playback</span>
+        </div>
+      </section>
+
+      <section>
+        <h2>Comfortable default - 120 x 36</h2>
+        <div class="terminal terminal-default" aria-label="Comfortable terminal mockup">
+          <div class="topbar">
+            <span class="brand">MIDI Capture</span>
+            <span class="mode recording">RECORDING</span>
+            <span class="activity rx">RX*</span>
+            <span class="activity tx">TX.</span>
+            <span class="endpoint">SRC [0] MIDIFACE 2x2</span>
+            <span class="endpoint">DST [0] Prophet Rev2</span>
+          </div>
+          <div class="pathbar">Recordings: /Users/peter/music/midi/takes</div>
+          <div class="workspace">
+            <aside class="files">
+              <div class="panel-title">Files</div>
+              <div class="file-row selected">20260514000738.mid</div>
+              <div class="file-row">20260514000716.mid</div>
+              <div class="file-row">20260512040548.mid</div>
+              <div class="file-row">bassline-sketch.mid</div>
+              <div class="file-row">filter-sweep.mid</div>
+              <div class="file-row muted">No older takes visible</div>
+            </aside>
+            <section class="sequence">
+              <div class="panel-title">Sequence - 20260514000738.mid - 128 events</div>
+              <div class="table header">
+                <span></span><span>#</span><span>time</span><span>dir</span><span>bytes</span><span>description</span>
+              </div>
+              <div class="table row note-on">
+                <span>&gt;</span><span>1</span><span>00:00.0</span><span>SEQ</span><span>90 3C 60</span><span>Note On C4 velocity 96 channel 1</span>
+              </div>
+              <div class="table row control">
+                <span></span><span>2</span><span>00:00.1</span><span>SEQ</span><span>B0 40 7F</span><span>Control Change 64 value 127 channel 1</span>
+              </div>
+              <div class="table row bend">
+                <span></span><span>3</span><span>00:00.3</span><span>SEQ</span><span>E0 12 42</span><span>Pitch Bend +530 channel 1</span>
+              </div>
+              <div class="table row note-off">
+                <span></span><span>4</span><span>00:00.8</span><span>SEQ</span><span>80 3C 00</span><span>Note Off C4 channel 1</span>
+              </div>
+              <div class="table row program">
+                <span></span><span>5</span><span>00:01.0</span><span>SEQ</span><span>C1 0C</span><span>Program Change 12 channel 2</span>
+              </div>
+            </section>
+          </div>
+          <section class="live">
+            <div class="panel-title">Live stream</div>
+            <div class="live-table header">
+              <span>time</span><span>dir</span><span>bytes</span><span>description</span>
+            </div>
+            <div class="live-table row note-on">
+              <span>00:04.2</span><span>RX</span><span>90 30 55</span><span>Note On C3 velocity 85 channel 1</span>
+            </div>
+            <div class="live-table row control">
+              <span>00:04.3</span><span>RX</span><span>B0 01 2A</span><span>Control Change 1 value 42 channel 1</span>
+            </div>
+            <div class="live-table row note-off">
+              <span>00:04.6</span><span>RX</span><span>80 30 00</span><span>Note Off C3 channel 1</span>
+            </div>
+            <div class="live-table row sysex">
+              <span>00:05.1</span><span>RX</span><span>F0 7E 7F 09 01 F7</span><span>SysEx 6 bytes</span>
+            </div>
+            <div class="live-table row warning">
+              <span>00:05.3</span><span>SKIP</span><span>F8</span><span>Unsupported system realtime message</span>
+            </div>
+          </section>
+          <footer class="footer">
+            <span>REC 00:04.8  42 events  1 ignored  output 20260514000738.mid</span>
+            <span>r record  p play  space pause  s stop  o dir  arrows navigate  q quit</span>
+          </footer>
+        </div>
+      </section>
+
+      <section>
+        <h2>Compact fallback - 90 x 20</h2>
+        <div class="terminal terminal-compact" aria-label="Compact terminal mockup">
+          <div class="topbar compact">
+            <span class="brand">MIDI Capture</span>
+            <span class="mode playback">PLAYING</span>
+            <span class="activity rx">RX.</span>
+            <span class="activity tx">TX*</span>
+            <span class="endpoint">SRC MIDIFACE</span>
+            <span class="endpoint">DST Rev2</span>
+          </div>
+          <div class="workspace compact">
+            <aside class="files">
+              <div class="panel-title">Files</div>
+              <div class="file-row selected">20260514000738.mid</div>
+              <div class="file-row">20260514000716.mid</div>
+              <div class="file-row">20260512040548.mid</div>
+            </aside>
+            <section class="sequence">
+              <div class="panel-title">Sequence - 128 events</div>
+              <div class="table compact header">
+                <span></span><span>time</span><span>dir</span><span>bytes</span><span>description</span>
+              </div>
+              <div class="table compact row note-on">
+                <span>&gt;</span><span>00:00.0</span><span>SEQ</span><span>90 3C 60</span><span>Note On C4 vel 96 ch 1</span>
+              </div>
+              <div class="table compact row control">
+                <span></span><span>00:00.1</span><span>SEQ</span><span>B0 40 7F</span><span>CC 64 value 127 ch 1</span>
+              </div>
+            </section>
+          </div>
+          <section class="live compact">
+            <div class="panel-title">Live stream</div>
+            <div class="live-table compact row note-on">
+              <span>00:04.2</span><span>RX</span><span>90 30 55</span><span>Note On C3 vel 85 ch 1</span>
+            </div>
+            <div class="live-table compact row note-off">
+              <span>00:04.6</span><span>RX</span><span>80 30 00</span><span>Note Off C3 ch 1</span>
+            </div>
+          </section>
+          <footer class="footer compact">
+            <span>PLAY 00:00.3 / 12.8s event 3/128</span>
+            <span>r p space s o arrows q</span>
+          </footer>
+        </div>
+      </section>
+
+      <section>
+        <h2>Wide terminal - 150 x 42</h2>
+        <div class="terminal terminal-wide" aria-label="Wide terminal mockup">
+          <div class="topbar">
+            <span class="brand">MIDI Capture</span>
+            <span class="mode">IDLE</span>
+            <span class="activity rx">RX.</span>
+            <span class="activity tx">TX.</span>
+            <span class="endpoint">SRC [0] Elektron Overbridge</span>
+            <span class="endpoint">DST [0] IAC Driver Bus 1</span>
+          </div>
+          <div class="pathbar">Recordings: /Users/peter/music/midi/takes/session-2026-05-14</div>
+          <div class="wide-grid">
+            <aside class="files">
+              <div class="panel-title">Files</div>
+              <div class="file-row selected">20260514000738.mid</div>
+              <div class="file-row">20260514000716.mid</div>
+              <div class="file-row">20260512040548.mid</div>
+              <div class="file-row">poly-aftertouch-test.mid</div>
+              <div class="file-row">program-bank-ideas.mid</div>
+            </aside>
+            <section class="sequence">
+              <div class="panel-title">Sequence - selected take</div>
+              <div class="table wide header">
+                <span></span><span>#</span><span>time</span><span>dir</span><span>bytes</span><span>description</span>
+              </div>
+              <div class="table wide row note-on">
+                <span>&gt;</span><span>21</span><span>00:03.4</span><span>SEQ</span><span>91 43 64</span><span>Note On G4 velocity 100 channel 2</span>
+              </div>
+              <div class="table wide row program">
+                <span></span><span>22</span><span>00:03.5</span><span>SEQ</span><span>D1 22</span><span>Channel Pressure 34 channel 2</span>
+              </div>
+              <div class="table wide row bend">
+                <span></span><span>23</span><span>00:03.7</span><span>SEQ</span><span>E1 18 50</span><span>Pitch Bend +3096 channel 2</span>
+              </div>
+            </section>
+            <aside class="details">
+              <div class="panel-title">Selected</div>
+              <p class="metric">Event 21 / 128</p>
+              <p>00:03.4</p>
+              <p class="note-on">Note On G4 velocity 100 channel 2</p>
+              <p class="muted">The details strip is optional. Add it only if
+                wide layout remains uncluttered after the core tables land.</p>
+            </aside>
+          </div>
+          <section class="live wide">
+            <div class="panel-title">Live stream</div>
+            <div class="live-table wide header">
+              <span>time</span><span>dir</span><span>bytes</span><span>description</span>
+            </div>
+            <div class="live-table wide row note-on">
+              <span>00:14.8</span><span>RX</span><span>92 24 7F</span><span>Note On C2 velocity 127 channel 3</span>
+            </div>
+            <div class="live-table wide row program">
+              <span>00:15.0</span><span>TX</span><span>C2 18</span><span>Program Change 24 channel 3</span>
+            </div>
+            <div class="live-table wide row control">
+              <span>00:15.3</span><span>RX</span><span>B2 4A 40</span><span>Control Change 74 value 64 channel 3</span>
+            </div>
+          </section>
+          <footer class="footer">
+            <span>Loaded 20260514000738.mid with 128 events</span>
+            <span>r record  p play  space pause/resume  s stop  o output dir  arrows navigate  q quit</span>
+          </footer>
+        </div>
+      </section>
+    </main>
+  </body>
+</html>

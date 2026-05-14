@@ -1,0 +1,244 @@
+<!doctype html>
+<html lang="en">
+  <head>
+    <meta charset="utf-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1">
+    <title>Phase 8 TUI Mockups V2</title>
+    <link rel="icon" href="data:,">
+    <link rel="stylesheet" href="styles.css">
+  </head>
+  <body>
+    <header class="page-header">
+      <p class="eyebrow">MIDI Capture TUI - Phase 8 V2</p>
+      <h1>Two-pane modes</h1>
+      <p>
+        Files stay full height. The right pane switches between sequence
+        inspection, expressive live playing, and raw live diagnostics.
+      </p>
+    </header>
+
+    <main>
+      <section>
+        <h2>Mode model</h2>
+        <div class="mode-notes">
+          <article>
+            <h3>Sequence</h3>
+            <p>File-first table for selected takes. Human columns stay primary; raw bytes stay visible but secondary.</p>
+          </article>
+          <article>
+            <h3>Live Player</h3>
+            <p>Performance view. Active notes, velocity bars, pressure, modulation, and pitch bend. Released notes dim and fade out.</p>
+          </article>
+          <article>
+            <h3>Live Diagnostic</h3>
+            <p>Full MIDI stream table for debugging. Time, direction, status, channel, target, value, raw bytes, and description.</p>
+          </article>
+        </div>
+      </section>
+
+      <section>
+        <h2>Sequence mode - 120 x 36</h2>
+        <div class="terminal">
+          <div class="status-rail">
+            <span class="brand">MIDI Capture</span>
+            <span class="pill">SEQUENCE</span>
+            <span class="activity rx idle">RX.</span>
+            <span class="activity tx hot">TX*</span>
+            <span class="endpoint">SRC [0] KeyLab 88</span>
+            <span class="endpoint">DST [0] IAC Driver Bus 1</span>
+            <span class="version">v0.8.0</span>
+          </div>
+          <div class="terminal-body">
+            <aside class="files-pane">
+              <div class="pane-title">Files</div>
+              <div class="path">/Users/peter/music/midi/takes</div>
+              <div class="file selected">20260514000738.mid</div>
+              <div class="file">20260514000716.mid</div>
+              <div class="file">20260512040548.mid</div>
+              <div class="file">bassline-sketch.mid</div>
+              <div class="file">filter-sweep.mid</div>
+              <div class="file">poly-aftertouch-test.mid</div>
+              <div class="file dim">program-bank-ideas.mid</div>
+            </aside>
+            <section class="work-pane">
+              <div class="pane-title split">
+                <span>Sequence - 20260514000738.mid</span>
+                <span>128 events</span>
+              </div>
+              <div class="seq-table header">
+                <span>#</span><span>time</span><span>ch</span><span>event</span><span>target</span><span>value</span><span>raw</span>
+              </div>
+              <div class="seq-table row selected-row note-on">
+                <span>21</span><span>00:03.4</span><span>1</span><span>Note On</span><span>E1</span><span>vel 65</span><span>90 28 41</span>
+              </div>
+              <div class="seq-table row control">
+                <span>22</span><span>00:03.5</span><span>1</span><span>CC 1</span><span>Mod</span><span><i class="bar small" style="--value: 42%"></i>42</span><span>B0 01 2A</span>
+              </div>
+              <div class="seq-table row pressure">
+                <span>23</span><span>00:03.7</span><span>1</span><span>Ch Pressure</span><span>Channel</span><span><i class="bar small amber" style="--value: 41%"></i>41</span><span>D0 29</span>
+              </div>
+              <div class="seq-table row bend">
+                <span>24</span><span>00:04.0</span><span>1</span><span>Pitch Bend</span><span>Bend</span><span>+530</span><span>E0 12 42</span>
+              </div>
+              <div class="seq-table row note-off">
+                <span>25</span><span>00:04.2</span><span>1</span><span>Note Off</span><span>E1</span><span>rel 0</span><span>80 28 00</span>
+              </div>
+              <div class="seq-table row program">
+                <span>26</span><span>00:04.9</span><span>2</span><span>Program</span><span>Patch</span><span>12</span><span>C1 0C</span>
+              </div>
+            </section>
+          </div>
+          <footer class="footer">
+            <span>PLAY 00:03.4 / 12.8s  event 21/128</span>
+            <span>tab mode  p play  space pause  s stop  o dir  arrows navigate  q quit</span>
+          </footer>
+        </div>
+      </section>
+
+      <section>
+        <h2>Live Player mode - expressive monitor</h2>
+        <div class="terminal">
+          <div class="status-rail">
+            <span class="brand">MIDI Capture</span>
+            <span class="pill live">LIVE PLAYER</span>
+            <span class="activity rx hot">RX*</span>
+            <span class="activity tx idle">TX.</span>
+            <span class="endpoint">SRC [0] KeyLab 88</span>
+            <span class="endpoint">CH 1</span>
+            <span class="version">v0.8.0</span>
+          </div>
+          <div class="terminal-body">
+            <aside class="files-pane">
+              <div class="pane-title">Files</div>
+              <div class="path">/Users/peter/music/midi/takes</div>
+              <div class="file selected">20260514000738.mid</div>
+              <div class="file">20260514000716.mid</div>
+              <div class="file">20260512040548.mid</div>
+              <div class="file">bassline-sketch.mid</div>
+              <div class="file">filter-sweep.mid</div>
+              <div class="file dim">Live monitor ignores file selection</div>
+            </aside>
+            <section class="work-pane player-pane">
+              <div class="pane-title split">
+                <span>Live Player - KeyLab 88</span>
+                <span>fade 2.5s</span>
+              </div>
+              <div class="channel-strip">
+                <span class="channel">CH 1</span>
+                <span class="control-label">Mod</span>
+                <i class="bar" style="--value: 37%"></i>
+                <span class="control-value">37</span>
+                <span class="control-label">Ch Pressure</span>
+                <i class="bar amber" style="--value: 41%"></i>
+                <span class="control-value">41</span>
+                <span class="control-label">Pitch</span>
+                <i class="bendbar" style="--value: 58%"></i>
+                <span class="control-value">+530</span>
+              </div>
+              <div class="note-list">
+                <div class="note-row active">
+                  <span class="note">E1</span>
+                  <span class="state">ON</span>
+                  <i class="bar velocity" style="--value: 65%"></i>
+                  <span class="value">65</span>
+                  <span class="meta">vel</span>
+                </div>
+                <div class="note-row active">
+                  <span class="note">G1</span>
+                  <span class="state">ON</span>
+                  <i class="bar velocity" style="--value: 51%"></i>
+                  <span class="value">51</span>
+                  <span class="meta">vel</span>
+                </div>
+                <div class="note-row active pressure-note">
+                  <span class="note">A1</span>
+                  <span class="state">ON</span>
+                  <i class="bar velocity" style="--value: 8%"></i>
+                  <span class="value">8</span>
+                  <span class="meta">poly pressure</span>
+                  <i class="bar amber" style="--value: 34%"></i>
+                </div>
+                <div class="note-row released">
+                  <span class="note">C2</span>
+                  <span class="state">OFF</span>
+                  <i class="bar velocity" style="--value: 53%"></i>
+                  <span class="value">53</span>
+                  <span class="meta">fading</span>
+                </div>
+                <div class="note-row ghost">
+                  <span class="note">E2</span>
+                  <span class="state">OFF</span>
+                  <i class="bar velocity" style="--value: 53%"></i>
+                  <span class="value">53</span>
+                  <span class="meta">fade out</span>
+                </div>
+              </div>
+            </section>
+          </div>
+          <footer class="footer">
+            <span>Live Player shows active notes and expressive controls only</span>
+            <span>tab mode  c channel  s stop  o dir  arrows files  q quit</span>
+          </footer>
+        </div>
+      </section>
+
+      <section>
+        <h2>Live Diagnostic mode - full stream</h2>
+        <div class="terminal">
+          <div class="status-rail">
+            <span class="brand">MIDI Capture</span>
+            <span class="pill diagnostic">LIVE DIAGNOSTIC</span>
+            <span class="activity rx hot">RX*</span>
+            <span class="activity tx hot">TX*</span>
+            <span class="endpoint">SRC [0] KeyLab 88</span>
+            <span class="endpoint">DST [0] IAC Driver Bus 1</span>
+            <span class="version">v0.8.0</span>
+          </div>
+          <div class="terminal-body">
+            <aside class="files-pane">
+              <div class="pane-title">Files</div>
+              <div class="path">/Users/peter/music/midi/takes</div>
+              <div class="file selected">20260514000738.mid</div>
+              <div class="file">20260514000716.mid</div>
+              <div class="file">20260512040548.mid</div>
+              <div class="file">poly-aftertouch-test.mid</div>
+              <div class="file">diagnostic-capture.mid</div>
+              <div class="file dim">Diagnostic logs continue live</div>
+            </aside>
+            <section class="work-pane">
+              <div class="pane-title split">
+                <span>Live Diagnostic</span>
+                <span>last 128 messages</span>
+              </div>
+              <div class="diag-table header">
+                <span>time</span><span>dir</span><span>ch</span><span>event</span><span>target</span><span>value</span><span>raw</span><span>description</span>
+              </div>
+              <div class="diag-table row note-on">
+                <span>00:04.21</span><span>RX</span><span>1</span><span>Note On</span><span>E1</span><span>vel 65</span><span>90 28 41</span><span>Note On E1 velocity 65 channel 1</span>
+              </div>
+              <div class="diag-table row control">
+                <span>00:04.23</span><span>RX</span><span>1</span><span>CC 1</span><span>Mod</span><span><i class="bar small" style="--value: 37%"></i>37</span><span>B0 01 25</span><span>Modulation wheel value 37</span>
+              </div>
+              <div class="diag-table row pressure">
+                <span>00:04.26</span><span>RX</span><span>1</span><span>Ch Press</span><span>Channel</span><span><i class="bar small amber" style="--value: 41%"></i>41</span><span>D0 29</span><span>Channel pressure 41</span>
+              </div>
+              <div class="diag-table row bend">
+                <span>00:04.29</span><span>RX</span><span>1</span><span>Pitch Bend</span><span>Bend</span><span>+530</span><span>E0 12 42</span><span>Pitch bend above center</span>
+              </div>
+              <div class="diag-table row note-off">
+                <span>00:04.66</span><span>RX</span><span>1</span><span>Note Off</span><span>E1</span><span>rel 0</span><span>80 28 00</span><span>Note Off E1 channel 1</span>
+              </div>
+              <div class="diag-table row sysex">
+                <span>00:05.10</span><span>RX</span><span>-</span><span>SysEx</span><span>Device</span><span>6 bytes</span><span>F0 7E 7F...</span><span>Universal non-realtime identity request</span>
+              </div>
+            </section>
+          </div>
+          <footer class="footer">
+            <span>Diagnostic stream keeps bytes and descriptions visible</span>
+            <span>tab mode  f filter  space pause log  s stop  o dir  q quit</span>
+          </footer>
+        </div>
+      </section>
+    </main>
+  </body>
+</html>
