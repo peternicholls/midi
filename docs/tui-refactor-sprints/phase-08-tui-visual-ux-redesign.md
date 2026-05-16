@@ -197,7 +197,8 @@ Implementation notes:
 - The version label should come from a single compile-time app version source,
   not a string literal duplicated inside the renderer. If the project has not
   defined one by implementation time, add a small `APP_VERSION` macro or
-  `app_version()` helper as part of the status-rail slice.
+  `app_version()` helper as part of the status-rail slice. Prefer
+  `app_support.*` or one build-time definition as the owning source.
 - Add explicit render fields only if the footer string becomes too overloaded.
 
 ### Key Command Strip
@@ -374,11 +375,15 @@ Deferred:
 
 ## Directory Browser
 
-Directory selection should use a column-based TUI browser instead of a blank
-path prompt.
+Full column-based directory-browser implementation belongs to Phase 9. Phase 8
+should reserve the layout, key-command, overlay, and footer/status hooks that
+Phase 9 will plug into so the browser lands inside the approved redesign
+without reopening the geometry work.
 
 Rules:
 
+- Phase 8 keeps the `d` entry point and the overlay/layout contract; Phase 9
+  owns the full column renderer, navigation model, and destination-apply flow.
 - Columns show each path level.
 - `tab` moves between columns.
 - Arrow keys move within a column.
@@ -437,12 +442,23 @@ constraints that should be folded into the redesign before code starts:
 
 ## Implementation Plan
 
-### Slice 1: Renderer Layout Contract
+The slice order is intentional:
+
+- land the status rail and command strip before validating table-heavy layouts
+- establish structured live data before rendering Live Player or Live
+  Diagnostic panes
+- keep full directory-browser implementation in Phase 9, while Phase 8 prepares
+  the entry point and layout contract
+
+### Slice 1: Layout, Status Rail, And Version Contract
 
 Files:
 
 - `src/tui_render.h`
 - `src/tui_render.c`
+- `src/command_tui.c`
+- possibly `src/app_support.h`
+- possibly `src/app_support.c`
 
 Tasks:
 
@@ -452,14 +468,22 @@ Tasks:
 - Cap file-browser width between 28 and 36 columns.
 - Keep the file pane full height and give the work pane the remaining width and
   full available height.
+- Move source/destination prominence to the status rail.
+- Add a top-right version label sourced from a single app-version definition.
+- Add the key command strip below the rail.
+- Use active recording/playback color on the mode label and RX/TX indicators
+  when available.
+- Move common key hints out of the footer and into the command strip.
+- Clip long paths and status messages deliberately.
 - Keep all calculations in `tui_render.c`.
 
 Verification:
 
 - Build succeeds.
 - Manual resize checks at 90x20, 90x24, 120x36, and a wide terminal.
+- Active recording and playback states are readable within one glance.
 
-### Slice 2: Table Rendering
+### Slice 2: Sequence Table Rendering Foundation
 
 Files:
 
@@ -473,10 +497,6 @@ Tasks:
 - Render sequence rows by columns instead of one formatted line.
 - Keep sequence columns to marker, `#/`, time, channel, event, target, value,
   and raw bytes.
-- Add Live Player columns for `#/`, note, state, velocity, pressure, bend/mod,
-  and age.
-- Add Live Diagnostic columns for time, direction, channel, event, target,
-  value, raw bytes, and description.
 - Make raw bytes dim where supported.
 - Keep bars paired with numeric values for accessibility.
 - Keep selected/current row visible via the marker column without changing the
@@ -488,31 +508,7 @@ Verification:
 - Long descriptions do not overwrite footer or borders.
 - Selected row remains visible in color and monochrome terminals.
 
-### Slice 3: Semantic Color Pass
-
-Files:
-
-- `src/tui_render.c`
-
-Tasks:
-
-- Rename color-pair constants around semantic roles where that improves
-  readability.
-- Keep dense table selection on the `>` marker; do not add a selected color pair
-  yet. File lists and overlays may continue to use `A_REVERSE`.
-- Add or refine color pairs for active recording, active playback, muted bytes,
-  and warning/status text where curses support allows.
-- Replace the SysEx/system `COLOR_WHITE` fallback with a neutral/default
-  treatment that works on light and dark terminals.
-- Ensure `has_colors() == false` uses no color-only cues.
-
-Verification:
-
-- Note on/off/control/program/pitch/SysEx/unsupported rows are visually
-  distinct enough in color mode.
-- Monochrome capture remains readable.
-
-### Slice 4: Mode And Live Data Structure
+### Slice 3: Mode And Live Data Structure
 
 Files:
 
@@ -532,19 +528,18 @@ Tasks:
   `value_text`, `byte_text`, `description`, and `category`, while preserving
   plain text for non-MIDI entries.
 - Update `log_midi_bytes()` to store structured live rows.
-- Render Live Diagnostic rows as a full stream table.
-- Render Live Player rows from current/recent note state, including fade age,
-  velocity, pressure, modulation, and pitch bend values.
+- Add a lightweight live-note state snapshot owned outside the renderer.
+- Feed the renderer the active right-pane mode and mode-specific headers.
 
 Verification:
 
 - Existing `tests/test_tui_log.c` still covers append/snapshot behavior.
 - Add or update tests for structured live-row snapshot if the log type changes.
-- RX and TX diagnostic rows show direction and description without reparsing in
-  the renderer.
-- Live Player rows show numeric values for every visual bar.
+- RX and TX diagnostic rows expose direction and description without renderer
+  reparsing.
+- Live Player state carries numeric values for every visual bar.
 
-### Slice 5: Status Rail And Footer Polish
+### Slice 4: Live Pane Rendering And Semantic Color
 
 Files:
 
@@ -554,49 +549,62 @@ Files:
 
 Tasks:
 
-- Move source/destination prominence to the status rail.
-- Add a top-right version label sourced from a single app-version definition.
-- Add the key command strip below the rail.
-- Use active recording/playback color on the mode label and RX/TX indicators
-  when available.
-- Move common key hints out of the footer and into the command strip.
-- Clip long paths and status messages deliberately.
+- Render Live Diagnostic rows as a full stream table with time, direction,
+  channel, event, target, value, raw bytes, and description columns.
+- Render Live Player rows from current/recent note state, including fade age,
+  velocity, pressure, modulation, and pitch bend values.
+- Rename color-pair constants around semantic roles where that improves
+  readability.
+- Keep dense table selection on the `>` marker; do not add a selected color pair
+  yet. File lists and overlays may continue to use `A_REVERSE`.
+- Add or refine color pairs for active recording, active playback, muted bytes,
+  and warning/status text where curses support allows.
+- Replace the SysEx/system `COLOR_WHITE` fallback with a neutral/default
+  treatment that works on light and dark terminals.
+- Ensure `has_colors() == false` uses no color-only cues.
 
 Verification:
 
-- Active recording and playback states are readable within one glance.
-- Footer stays useful for status such as loaded file, tempo, playhead, filters,
-  and append/unload state.
+- Live Diagnostic rows render from structured fields rather than formatted log
+  text.
+- Live Player rows show numeric values for every visual bar.
+- Note on/off/control/program/pitch/SysEx/unsupported rows are visually
+  distinct enough in color mode.
+- Monochrome capture remains readable.
 
-### Slice 6: Settings, Directory, And File Actions
+### Slice 5: Footer, Settings, File Actions, And Phase 9 Browser Hooks
 
 Files:
 
 - `src/command_tui.c`
 - `src/tui_render.h`
 - `src/tui_render.c`
-- possibly a future `src/tui_directory_browser.c`
-- possibly a future `src/tui_settings.c`
+- possibly `src/tui_settings.c`
 
 Tasks:
 
+- Keep the footer useful for loaded-file, tempo, playhead, filters, and
+  append/unload state without duplicating the status rail.
 - Add a settings overlay model for recordings directory, middle C, note format,
   fade timeout, tempo, and metronome.
-- Add a column-based directory browser model, replacing the blank path prompt.
 - Make file selection and file loading distinct.
 - Add unload, append-to-loaded-file, and rename flows.
 - Preserve `.mid` suffix during rename.
-- Add DAW-like transport behavior for `space`, `0`, and `home`.
+- Add the `d` entry point, overlay rectangle usage, and footer/status text
+  hooks needed by the Phase 9 directory browser.
+- Keep the existing manual path flow as the fallback until Phase 9 lands.
 
 Verification:
 
 - Settings values are visible and keyboard-adjustable.
-- Directory browser can apply a destination without manual path guessing.
+- Footer stays useful for status such as loaded file, tempo, playhead, filters,
+  and append/unload state.
 - Rename cannot remove the `.mid` suffix.
 - Append requires explicit user intent.
-- `space`, `0`, and `home` match the documented behavior.
+- Directory-browser entry and layout hooks are in place without duplicating
+  Phase 9's browser implementation.
 
-### Slice 7: Tempo, Metronome, And Accessibility
+### Slice 6: Tempo, Transport, Metronome, And Accessibility
 
 Files:
 
@@ -606,6 +614,7 @@ Files:
 
 Tasks:
 
+- Add DAW-like transport behavior for `space`, `0`, and `home`.
 - Add tempo state for playback speed scaling.
 - Add a recording metronome toggle using a simple single-tone click.
 - Ensure all bar visuals have numeric text alternatives.
@@ -617,6 +626,7 @@ Verification:
 
 - Playback speed can change via tempo without corrupting event order.
 - Metronome can be toggled on/off while recording setup is active.
+- `space`, `0`, and `home` match the documented behavior.
 - Live Player remains understandable without color.
 - Accessibility notes are reflected in the renderer behavior.
 
@@ -630,6 +640,8 @@ Verification:
 - `src/tui_model.c`
 - `src/midi_describe.c`
 - `src/midi_describe.h`
+- `src/app_support.c`
+- `src/app_support.h`
 - Phase 5 MIDI description categories
 - Phase 7 renderer isolation
 - Static mockups in `docs/tui-refactor-sprints/phase-08-mockups-codex/`
@@ -637,8 +649,6 @@ Verification:
 - Static mockups in `docs/tui-refactor-sprints/phase-08-mockups-v2/`
 - Static mockups in `docs/tui-refactor-sprints/phase-08-mockups-v3/`
 - Design review notes in `docs/tui-refactor-sprints/phase-08-review-claude-sonnet.md`
-- future `src/tui_directory_browser.c` if the browser is split out
-- future `src/tui_directory_browser.h` if the browser is split out
 - future `src/tui_settings.c` if settings are split out
 - future `src/tui_settings.h` if settings are split out
 
@@ -689,10 +699,13 @@ Verification:
 - [ ] Preserve dense-table selection with a leading `>` marker.
 - [ ] Preserve file-list and overlay selection with readable `A_REVERSE`.
 - [ ] Keep raw bytes visible but visually secondary.
+- [ ] Define a single app-version source for the status rail.
 - [ ] Improve active transport status readability in the status rail.
 - [ ] Add a top-right software version label to the status rail.
 - [ ] Add a readable key command strip below the status rail.
 - [ ] Preserve footer space for loaded file/status/tempo/playhead state.
+- [ ] Extend live data structures before rendering Live Player and Live
+      Diagnostic panes.
 - [ ] Add settings overlay:
   - [ ] recordings directory
   - [ ] middle C convention
@@ -700,7 +713,7 @@ Verification:
   - [ ] Live Player fade timeout
   - [ ] tempo
   - [ ] metronome
-- [ ] Add column-based directory browser.
+- [ ] Add the directory-browser entry point and layout/status hooks for Phase 9.
 - [ ] Add load/unload/append/rename file actions.
 - [ ] Add DAW-style transport keys: `space`, `0`, and `home`.
 - [ ] Add tempo playback scaling.
@@ -735,13 +748,13 @@ Verification:
 - [ ] Long file names, byte strings, descriptions, paths, and status messages
       clip cleanly.
 - [ ] Monochrome fallback is still readable.
-- [ ] Recording, playback, navigation, settings, directory browsing, and live
-      monitoring still work.
+- [ ] Recording, playback, navigation, settings, and live monitoring still
+  work.
 - [ ] Live Diagnostic RX and TX rows show direction, bytes, and description.
 - [ ] Live Player rows show note state, velocity, pressure, bend/mod, and age
       with numeric values.
 - [ ] Settings are reachable and keyboard-adjustable.
-- [ ] Directory browser applies a destination without manual path guessing.
+- [ ] Directory-browser entry and overlay/footer hooks are in place for Phase 9.
 - [ ] Tempo and metronome controls are visible and non-destructive.
 - [ ] Accessibility checks confirm color is not the only carrier of state.
 
@@ -757,7 +770,8 @@ Verification:
   bend/mod, and age columns.
 - Live Diagnostic rows include aligned time, direction, channel, event, target,
   value, raw bytes, and description columns.
-- Settings and directory selection are discoverable from the key command strip.
+- Settings are discoverable from the key command strip, and directory-browser
+  entry remains discoverable while the full browser flow lands in Phase 9.
 - Load, unload, append, rename, tempo, and metronome behaviors are documented in
   the UI and implemented without surprising side effects.
 - Color communicates event type and transport state without reducing

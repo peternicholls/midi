@@ -13,6 +13,9 @@ the engineering plan for sequencing the work.
 ## Planning Constraints
 
 - Keep the Signal Desk visual direction from the redesign brief.
+- Use `docs/tui-refactor-sprints/phase-08-mockups-v3/index.html` as the
+      primary layout reference for the full-height file pane and right-side
+      mode-aware work pane.
 - Preserve the compact supported minimum of 90x20 while treating 90x24 as the
   preferred redesign minimum.
 - Keep the file browser persistent and full height in normal use.
@@ -30,7 +33,7 @@ tests, and a small manual TUI pass before the next phase starts.
 Sequencing logic:
 
 1. Establish layout and status hierarchy first so later stories target a stable
-   geometry contract.
+      geometry contract grounded in the V3 mockup.
 2. Replace formatted row strings with clipped table rendering before adding more
    modes or richer live data.
 3. Add right-pane mode control and structured live data before attaching new
@@ -131,7 +134,7 @@ Exit criteria:
 ## Phase 8B: Table Rendering And Dense Data Presentation
 
 Objective: replace monolithic formatted rows with clipped, per-cell table
-rendering.
+rendering, starting with the reusable cell helper and the Sequence table.
 
 ### Story P8B.1: Add Reusable Clipped-Cell Drawing
 
@@ -176,31 +179,9 @@ Verification:
 - [ ] `make test`
 - [ ] Manual check that long raw bytes do not overwrite the value or footer
 
-### Story P8B.3: Render Compact Live Diagnostic Columns
-
-Goal: turn the current live log into a readable diagnostics table.
-
-Files:
-
-- `src/tui_render.c`
-- `src/tui_render.h`
-
-Tasks:
-
-- [ ] Add a Live Diagnostic header row.
-- [ ] Render time, direction, channel, event, target, value, raw, and
-      description columns.
-- [ ] Keep direction explicit for RX, TX, REC, PLAY, ERR, and MON rows.
-- [ ] Keep category styling on event or description cells, not on whole rows.
-
-Verification:
-
-- [ ] `make test`
-- [ ] Manual live-input check with RX and TX traffic
-
 Exit criteria:
 
-- Sequence and diagnostic rows render cell by cell.
+- Sequence rows render cell by cell.
 - Clipping prevents cross-column corruption.
 - Dense table selection stays readable in color and monochrome terminals.
 
@@ -258,9 +239,9 @@ Verification:
 - [ ] `make test`
 - [ ] Add or update tests for structured snapshot content
 
-### Story P8C.3: Implement Live Player Snapshot Rendering
+### Story P8C.3: Implement Live Diagnostic And Live Player Rendering
 
-Goal: provide a performance-oriented live pane rather than a raw log clone.
+Goal: render both live modes only after the structured data contract exists.
 
 Files:
 
@@ -272,6 +253,10 @@ Files:
 Tasks:
 
 - [ ] Add a lightweight live-note state snapshot owned outside the renderer.
+- [ ] Render Live Diagnostic rows from structured fields instead of formatted
+      log strings.
+- [ ] Render Live Diagnostic time, direction, channel, event, target, value,
+      raw, and description columns.
 - [ ] Render `#/`, note, state, velocity, pressure, bend/mod, and age columns.
 - [ ] Keep numeric values present for every bar or compact visual treatment.
 - [ ] Support fading and expiry without introducing unreadable churn.
@@ -293,7 +278,8 @@ Exit criteria:
 ## Phase 8D: File, Settings, And Directory Workflows
 
 Objective: add the user workflows that make the redesigned TUI practical rather
-than decorative.
+than decorative, while leaving the full directory-browser implementation in
+Phase 9.
 
 ### Story P8D.1: Separate Selection From File Actions
 
@@ -345,38 +331,36 @@ Verification:
 - [ ] `make test`
 - [ ] Manual settings interaction check
 
-### Story P8D.3: Add Column-Based Directory Browser
+### Story P8D.3: Prepare Phase 9 Directory Browser Hooks
 
-Goal: replace the blank directory-path prompt with guided navigation.
+Goal: make the browser entry point and layout contract real without duplicating
+Phase 9.
 
 Files:
 
 - `src/command_tui.c`
 - `src/tui_render.c`
 - `src/tui_render.h`
-- possibly `src/tui_directory_browser.c`
-- possibly `src/tui_directory_browser.h`
 
 Tasks:
 
-- [ ] Model path levels as focused columns.
-- [ ] Support `tab`, arrows, `enter`, and `esc`.
-- [ ] Show the selected absolute path in the footer.
-- [ ] Preserve a manual-path escape hatch.
-- [ ] Handle invalid or inaccessible directories with readable status text.
+- [ ] Keep `d` as the discoverable directory-browser entry point.
+- [ ] Reserve overlay and footer/status surfaces for the future browser.
+- [ ] Preserve the manual-path escape hatch until Phase 9 replaces it.
+- [ ] Document that column rendering, browser navigation, and destination apply
+      flow are owned by Phase 9.
 
 Verification:
 
-- [ ] `make`
 - [ ] `make test`
-- [ ] Manual browser flow check across parent, child, confirm, cancel, and
-      invalid-path cases
+- [ ] Manual check that the browser entry point and placeholder/status handling
+      do not regress existing directory changes
 
 Exit criteria:
 
 - File actions are explicit and reversible.
 - Settings are discoverable from the command strip.
-- Directory changes no longer depend on an empty path prompt.
+- Directory-browser entry and layout hooks are in place for Phase 9.
 
 ## Phase 8E: Transport, Accessibility, And Final Hardening
 
