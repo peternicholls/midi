@@ -1,5 +1,6 @@
 CC := clang
-CFLAGS := -std=c11 -Wall -Wextra -Wpedantic -Isrc
+VERSION := $(shell tr -d '[:space:]' < VERSION)
+CFLAGS := -std=c11 -Wall -Wextra -Wpedantic -Isrc -DAPP_VERSION=\"$(VERSION)\"
 APP_LDFLAGS := -lcurses -framework CoreMIDI -framework AudioToolbox -framework CoreFoundation -framework CoreAudio
 
 APP := midi-capture
