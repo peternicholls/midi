@@ -11,12 +11,79 @@ typedef enum TuiColorPair {
   TUI_COLOR_CONTROL = 3,
   TUI_COLOR_PROGRAM = 4,
   TUI_COLOR_BEND = 5,
-  TUI_COLOR_SYSTEM = 6,
-  TUI_COLOR_WARNING = 7
+  TUI_COLOR_WARNING = 6,
+  TUI_COLOR_RECORDING = 7,
+  TUI_COLOR_PLAYBACK = 8
 } TuiColorPair;
+
+typedef struct TuiRect {
+  int top;
+  int left;
+  int width;
+  int height;
+} TuiRect;
+
+typedef struct TuiLayout {
+  TuiRect status_rail;
+  TuiRect command_strip;
+  TuiRect file_pane;
+  TuiRect work_pane;
+  TuiRect footer;
+  TuiRect overlay;
+  bool compact;
+} TuiLayout;
 
 static const char *text_or_empty(const char *text) {
   return text != NULL ? text : "";
+}
+
+static int clamp_int(int value, int min_value, int max_value) {
+  if (value < min_value) {
+    return min_value;
+  }
+  if (value > max_value) {
+    return max_value;
+  }
+  return value;
+}
+
+static TuiLayout calculate_layout(int rows, int cols) {
+  TuiLayout layout;
+  int content_top = 3;
+  int content_bottom = rows - 3;
+  int file_width;
+  int overlay_width;
+  int overlay_height;
+
+  memset(&layout, 0, sizeof(layout));
+  layout.compact = rows < 24;
+  layout.status_rail = (TuiRect){0, 0, cols, 1};
+  layout.command_strip = (TuiRect){1, 0, cols, 1};
+  layout.footer = (TuiRect){rows - 1, 0, cols, 1};
+
+  /*
+   * Preferred geometry: 90x24 keeps a 28-column browser and a 57-column work
+   * pane; 120x36 grows the browser to 30 columns; wide terminals cap the
+   * browser at 36 so the work pane receives all additional inspection width.
+   * Compact 90x20-90x23 keeps the same horizontal contract and spends the
+   * reduced height entirely on the two persistent panes.
+   */
+  file_width = clamp_int(cols / 4, 28, 36);
+  if (content_bottom < content_top) {
+    content_bottom = content_top;
+  }
+  layout.file_pane =
+      (TuiRect){content_top, 0, file_width, content_bottom - content_top + 1};
+  layout.work_pane =
+      (TuiRect){content_top, file_width + 1, cols - file_width - 1,
+                content_bottom - content_top + 1};
+
+  overlay_width = clamp_int(cols - 10, 52, 76);
+  overlay_height = 10;
+  layout.overlay =
+      (TuiRect){(rows - overlay_height) / 2, (cols - overlay_width) / 2,
+                overlay_width, overlay_height};
+  return layout;
 }
 
 static void draw_clipped_text(int row, int col, int width, const char *text,
@@ -24,9 +91,43 @@ static void draw_clipped_text(int row, int col, int width, const char *text,
   if (width <= 0 || text == NULL) {
     return;
   }
-  attron(attr);
+  if (attr != 0) {
+    attron(attr);
+  }
   mvaddnstr(row, col, text, width);
-  attroff(attr);
+  if (attr != 0) {
+    attroff(attr);
+  }
+}
+
+static void draw_left_clipped_text(int row, int col, int width,
+                                   const char *text, int attr) {
+  size_t length;
+  const char *tail;
+
+  if (width <= 0 || text == NULL) {
+    return;
+  }
+
+  length = strlen(text);
+  if (length <= (size_t)width || width <= 4) {
+    draw_clipped_text(row, col, width, text, attr);
+    return;
+  }
+
+  tail = text + length - (size_t)width + 3;
+  draw_clipped_text(row, col, 3, "...", attr);
+  draw_clipped_text(row, col + 3, width - 3, tail, attr);
+}
+
+static void draw_cell(int row, int *col, int width, const char *text,
+                      int attr) {
+  if (width <= 0 || col == NULL) {
+    return;
+  }
+  mvhline(row, *col, ' ', width);
+  draw_clipped_text(row, *col, width, text_or_empty(text), attr);
+  *col += width;
 }
 
 static int category_attrs(MidiDescriptionCategory category) {
@@ -48,7 +149,7 @@ static int category_attrs(MidiDescriptionCategory category) {
   case MIDI_DESCRIPTION_PITCH_BEND:
     return COLOR_PAIR(TUI_COLOR_BEND);
   case MIDI_DESCRIPTION_SYSEX:
-    return COLOR_PAIR(TUI_COLOR_SYSTEM);
+    return A_DIM;
   case MIDI_DESCRIPTION_UNSUPPORTED:
   case MIDI_DESCRIPTION_INCOMPLETE:
     return COLOR_PAIR(TUI_COLOR_WARNING);
@@ -57,39 +158,111 @@ static int category_attrs(MidiDescriptionCategory category) {
   return 0;
 }
 
-static void draw_header(const TuiRenderState *state, int cols) {
-  char transport_label[128];
-
-  snprintf(transport_label, sizeof(transport_label), "%s  RX%s TX%s",
-           text_or_empty(state->mode_label), state->rx_active ? "." : " ",
-           state->tx_active ? "." : " ");
-
-  attron(A_BOLD);
-  mvaddnstr(0, 2, "MIDI Capture TUI", cols - 4);
-  mvaddnstr(0, cols - (int)strlen(transport_label) - 2, transport_label,
-            (int)strlen(transport_label));
-  attroff(A_BOLD);
-  mvaddnstr(1, 2, "Recordings: ", 12);
-  mvaddnstr(1, 14, text_or_empty(state->recordings_dir), cols - 16);
-  mvaddnstr(2, 2, text_or_empty(state->source_label), cols / 2 - 3);
-  mvaddnstr(2, cols / 2, text_or_empty(state->destination_label),
-            cols - cols / 2 - 2);
-  mvaddnstr(3, 2,
-            "r record  p play  space pause/resume  s stop  o output dir  "
-            "arrows navigate  q quit",
-            cols - 4);
-  mvhline(4, 0, ACS_HLINE, cols);
+static int mode_attrs(const TuiRenderState *state) {
+  if (!has_colors() || state == NULL) {
+    return A_BOLD;
+  }
+  if (state->record_active) {
+    return COLOR_PAIR(TUI_COLOR_RECORDING) | A_BOLD;
+  }
+  if (state->playback_active) {
+    return COLOR_PAIR(TUI_COLOR_PLAYBACK) | A_BOLD;
+  }
+  return A_BOLD;
 }
 
-static void draw_files_panel(const TuiRenderState *state, int top, int left,
-                             int width, int height) {
+static const char *work_pane_mode_text(TuiRenderWorkPaneMode mode) {
+  switch (mode) {
+  case TUI_RENDER_WORK_PANE_SEQUENCE:
+    return "SEQUENCE";
+  case TUI_RENDER_WORK_PANE_LIVE_PLAYER:
+    return "LIVE PLAYER";
+  case TUI_RENDER_WORK_PANE_LIVE_DIAGNOSTIC:
+    return "LIVE DIAGNOSTIC";
+  }
+  return "SEQUENCE";
+}
+
+static void draw_status_rail(const TuiRenderState *state,
+                             const TuiLayout *layout) {
+  char app_label[64];
+  char endpoint_text[192];
+  char path[256];
+  int row = layout->status_rail.top;
+  int col = 1;
+  int mode_width = 18;
+  int endpoint_width;
+  int path_width;
+
+  mvhline(row, 0, ' ', layout->status_rail.width);
+  snprintf(app_label, sizeof(app_label), "MIDI Capture %s  [",
+           text_or_empty(state->app_version));
+  draw_clipped_text(row, col, (int)strlen(app_label), app_label, A_BOLD);
+  col += (int)strlen(app_label);
+  draw_clipped_text(row, col, mode_width, text_or_empty(state->mode_label),
+                    mode_attrs(state));
+  col += mode_width;
+  draw_clipped_text(row, col, 2, "] ", A_BOLD);
+  col += 2;
+
+  snprintf(endpoint_text, sizeof(endpoint_text), "RX:%s TX:%s  %.36s  %.36s",
+           state->rx_active ? "ON" : "--", state->tx_active ? "ON" : "--",
+           text_or_empty(state->source_label),
+           text_or_empty(state->destination_label));
+  path_width = 30;
+  endpoint_width = layout->status_rail.width - col - path_width - 2;
+  if (endpoint_width < 12) {
+    endpoint_width = layout->status_rail.width - col - 1;
+    path_width = 0;
+  }
+  draw_clipped_text(row, col, endpoint_width, endpoint_text, 0);
+
+  if (path_width > 0) {
+    snprintf(path, sizeof(path), "DIR %s",
+             text_or_empty(state->recordings_dir));
+    draw_left_clipped_text(row, layout->status_rail.width - path_width - 1,
+                           path_width, path, A_DIM);
+  }
+}
+
+static void draw_command_strip(const TuiRenderState *state,
+                               const TuiLayout *layout) {
+  const char *command_text;
+  int row = layout->command_strip.top;
+
+  if (state->overlay == TUI_RENDER_OVERLAY_SETTINGS) {
+    command_text =
+        "settings: arrows choose/change  enter apply  ,/esc close  q quit";
+  } else if (state->overlay == TUI_RENDER_OVERLAY_DIRECTORY) {
+    command_text = "directory: enter/o manual path  esc close  q quit";
+  } else if (state->work_pane_mode == TUI_RENDER_WORK_PANE_SEQUENCE) {
+    command_text = "tab pane  v mode  arrows move  enter load  space "
+                   "play/pause  p play from here  u unload  a append  r rename "
+                   " R record  , settings  d dir  q quit";
+  } else if (state->work_pane_mode == TUI_RENDER_WORK_PANE_LIVE_PLAYER) {
+    command_text = "tab pane  v mode  space play/pause  s stop  R record  m "
+                   "metronome  , settings  d dir  q quit";
+  } else {
+    command_text = "tab pane  v mode  live diagnostic  space play/pause  s "
+                   "stop  R record  , settings  d dir  q quit";
+  }
+
+  mvhline(row, 0, ' ', layout->command_strip.width);
+  draw_clipped_text(row, 1, layout->command_strip.width - 2, command_text,
+                    A_DIM);
+  mvhline(row + 1, 0, ACS_HLINE, layout->command_strip.width);
+}
+
+static void draw_files_panel(const TuiRenderState *state, const TuiRect *rect) {
   const TuiFileList *files = state->files;
-  int visible = height - 2;
+  int visible = rect->height - 2;
   size_t scroll = 0;
   size_t count = files != NULL ? files->count : 0;
   size_t selected = files != NULL ? files->selected : 0;
+  int title_attr = state->focus == TUI_RENDER_FOCUS_FILES ? A_BOLD : 0;
 
-  mvaddnstr(top, left + 1, "Files", width - 2);
+  draw_clipped_text(rect->top, rect->left + 1, rect->width - 2, "Recordings",
+                    title_attr);
   if (visible <= 0) {
     return;
   }
@@ -98,42 +271,97 @@ static void draw_files_panel(const TuiRenderState *state, int top, int left,
   }
 
   for (int row = 0; row < visible; ++row) {
-    int screen_row = top + 1 + row;
+    int screen_row = rect->top + 1 + row;
     size_t index = scroll + (size_t)row;
+    char line[NAME_MAX + 4];
+    bool loaded = false;
 
-    move(screen_row, left + 1);
+    move(screen_row, rect->left + 1);
     clrtoeol();
     if (files == NULL || index >= count) {
       continue;
     }
 
+    loaded = state->sequence_loaded && state->sequence_name != NULL &&
+             strcmp(files->items[index].name, state->sequence_name) == 0;
+    snprintf(line, sizeof(line), "%c %s", loaded ? '*' : ' ',
+             files->items[index].name);
+
     if (index == selected) {
       attron(A_REVERSE);
     }
-    mvaddnstr(screen_row, left + 1, files->items[index].name, width - 2);
+    mvaddnstr(screen_row, rect->left + 1, line, rect->width - 2);
     if (index == selected) {
       attroff(A_REVERSE);
     }
   }
 
   if (count == 0) {
-    mvaddnstr(top + 1, left + 1, "No .mid files in destination", width - 2);
+    mvaddnstr(rect->top + 1, rect->left + 1, "No .mid files", rect->width - 2);
   }
 }
 
-static void draw_events_panel(const TuiRenderState *state, int top, int left,
-                              int width, int height) {
-  int visible = height - 3;
-  size_t scroll = 0;
+static void draw_sequence_header(int row, int left, int width) {
+  int col = left;
+  int desc_width = width - 56;
 
-  mvaddnstr(top, left + 1, "Sequence", width - 2);
+  if (desc_width < 0) {
+    desc_width = 0;
+  }
+  draw_cell(row, &col, 2, ">", A_BOLD);
+  draw_cell(row, &col, 5, "#/", A_BOLD);
+  draw_cell(row, &col, 8, "time", A_BOLD);
+  draw_cell(row, &col, 4, "ch", A_BOLD);
+  draw_cell(row, &col, 10, "event", A_BOLD);
+  draw_cell(row, &col, 8, "target", A_BOLD);
+  draw_cell(row, &col, 7, "value", A_BOLD);
+  draw_cell(row, &col, 12, "raw", A_BOLD | A_DIM);
+  draw_cell(row, &col, desc_width, "description", A_BOLD);
+}
+
+static void draw_sequence_row(const TuiRenderSequenceRow *event_row, int row,
+                              int left, int width) {
+  int col = left;
+  int attrs = category_attrs(event_row->category);
+  int selected_attrs = event_row->selected ? A_BOLD : 0;
+  int desc_width = width - 56;
+  char marker[2] = {event_row->selected ? '>' : ' ', '\0'};
+  char number[16];
+
+  if (desc_width < 0) {
+    desc_width = 0;
+  }
+  snprintf(number, sizeof(number), "%zu", event_row->index + 1);
+  draw_cell(row, &col, 2, marker, selected_attrs);
+  draw_cell(row, &col, 5, number, selected_attrs);
+  draw_cell(row, &col, 8, event_row->clock_text, 0);
+  draw_cell(row, &col, 4, event_row->channel, attrs);
+  draw_cell(row, &col, 10, event_row->event, attrs);
+  draw_cell(row, &col, 8, event_row->target, attrs);
+  draw_cell(row, &col, 7, event_row->value, attrs);
+  draw_cell(row, &col, 12, event_row->byte_text, A_DIM);
+  draw_cell(row, &col, desc_width, event_row->description, 0);
+}
+
+static void draw_sequence_panel(const TuiRenderState *state,
+                                const TuiRect *rect) {
+  int inner_left = rect->left + 1;
+  int inner_width = rect->width - 2;
+  int visible = rect->height - 4;
+  size_t scroll = 0;
+  int title_attr = state->focus == TUI_RENDER_FOCUS_WORK_PANE ? A_BOLD : 0;
+
+  draw_clipped_text(rect->top, inner_left, inner_width,
+                    work_pane_mode_text(state->work_pane_mode), title_attr);
   if (!state->sequence_loaded) {
-    mvaddnstr(top + 1, left + 1, "Select a MIDI file to inspect", width - 2);
+    mvaddnstr(rect->top + 2, inner_left, "Select a recording and press enter",
+              inner_width);
     return;
   }
 
-  mvprintw(top + 1, left + 1, "%s  %zu event(s)",
+  mvprintw(rect->top + 1, inner_left, "%s  %zu event(s)",
            text_or_empty(state->sequence_name), state->sequence_event_count);
+  draw_sequence_header(rect->top + 2, inner_left, inner_width);
   if (visible <= 0 || state->sequence_event_count == 0 ||
       state->sequence_row_provider == NULL) {
     return;
@@ -146,38 +374,79 @@ static void draw_events_panel(const TuiRenderState *state, int top, int left,
   for (int row = 0; row < visible; ++row) {
     TuiRenderSequenceRow event_row;
     size_t index = scroll + (size_t)row;
-    int screen_row = top + 2 + row;
-    char line[192];
-    int attrs;
+    int screen_row = rect->top + 3 + row;
 
-    move(screen_row, left + 1);
+    move(screen_row, inner_left);
     clrtoeol();
     if (index >= state->sequence_event_count ||
         !state->sequence_row_provider(state->sequence_context, index,
                                       &event_row)) {
       continue;
     }
-
-    snprintf(line, sizeof(line), "%c %4zu  %s  %-12s  %s",
-             event_row.selected ? '>' : ' ', event_row.index + 1,
-             event_row.clock_text, event_row.byte_text, event_row.description);
-
-    attrs = category_attrs(event_row.category);
-    if (event_row.selected) {
-      attrs |= A_REVERSE;
-    }
-    attron(attrs);
-    mvaddnstr(screen_row, left + 1, line, width - 2);
-    attroff(attrs);
+    draw_sequence_row(&event_row, screen_row, inner_left, inner_width);
   }
 }
 
-static void draw_log_panel(const TuiRenderState *state, int top, int left,
-                           int width, int height) {
-  int visible = height - 2;
-  size_t start = 0;
+static void draw_live_diagnostic_header(int row, int left, int width) {
+  int col = left;
+  int desc_width = width - 55;
 
-  mvaddnstr(top, left + 1, "Live Stream", width - 2);
+  if (desc_width < 0) {
+    desc_width = 0;
+  }
+  draw_cell(row, &col, 8, "time", A_BOLD);
+  draw_cell(row, &col, 4, "dir", A_BOLD);
+  draw_cell(row, &col, 4, "ch", A_BOLD);
+  draw_cell(row, &col, 10, "event", A_BOLD);
+  draw_cell(row, &col, 8, "target", A_BOLD);
+  draw_cell(row, &col, 7, "value", A_BOLD);
+  draw_cell(row, &col, 14, "raw", A_BOLD | A_DIM);
+  draw_cell(row, &col, desc_width, "description", A_BOLD);
+}
+
+static void draw_live_diagnostic_row(const TuiLogEntry *entry, int row,
+                                     int left, int width) {
+  int col = left;
+  int desc_width = width - 55;
+  int attrs;
+
+  if (desc_width < 0) {
+    desc_width = 0;
+  }
+  if (!entry->has_midi_fields) {
+    draw_cell(row, &col, 8, "-", 0);
+    draw_cell(row, &col, 4, "LOG", A_DIM);
+    draw_cell(row, &col, 4, "-", 0);
+    draw_cell(row, &col, 10, "message", 0);
+    draw_cell(row, &col, 8, "-", 0);
+    draw_cell(row, &col, 7, "-", 0);
+    draw_cell(row, &col, 14, "", A_DIM);
+    draw_cell(row, &col, desc_width, entry->line, 0);
+    return;
+  }
+
+  attrs = category_attrs(entry->midi.category);
+  draw_cell(row, &col, 8, entry->midi.time, 0);
+  draw_cell(row, &col, 4, entry->midi.direction, attrs);
+  draw_cell(row, &col, 4, entry->midi.channel, attrs);
+  draw_cell(row, &col, 10, entry->midi.event, attrs);
+  draw_cell(row, &col, 8, entry->midi.target, attrs);
+  draw_cell(row, &col, 7, entry->midi.value, attrs);
+  draw_cell(row, &col, 14, entry->midi.bytes, A_DIM);
+  draw_cell(row, &col, desc_width, entry->midi.description, 0);
+}
+
+static void draw_live_diagnostic_panel(const TuiRenderState *state,
+                                       const TuiRect *rect) {
+  int inner_left = rect->left + 1;
+  int inner_width = rect->width - 2;
+  int visible = rect->height - 3;
+  size_t start = 0;
+  int title_attr = state->focus == TUI_RENDER_FOCUS_WORK_PANE ? A_BOLD : 0;
+
+  draw_clipped_text(rect->top, inner_left, inner_width,
+                    work_pane_mode_text(state->work_pane_mode), title_attr);
+  draw_live_diagnostic_header(rect->top + 1, inner_left, inner_width);
   if (visible <= 0) {
     return;
   }
@@ -186,21 +455,159 @@ static void draw_log_panel(const TuiRenderState *state, int top, int left,
   }
 
   for (int row = 0; row < visible; ++row) {
-    int screen_row = top + 1 + row;
+    int screen_row = rect->top + 2 + row;
     size_t index = start + (size_t)row;
 
-    move(screen_row, left + 1);
+    move(screen_row, inner_left);
     clrtoeol();
     if (state->logs == NULL || index >= state->log_count) {
       continue;
     }
-    mvaddnstr(screen_row, left + 1, state->logs[index].line, width - 2);
+    draw_live_diagnostic_row(&state->logs[index], screen_row, inner_left,
+                             inner_width);
   }
 }
 
-static void draw_footer(const TuiRenderState *state, int row, int cols) {
-  mvhline(row - 1, 0, ACS_HLINE, cols);
-  draw_clipped_text(row, 2, cols - 4, text_or_empty(state->footer), A_BOLD);
+static void draw_live_player_header(int row, int left, int width) {
+  int col = left;
+  int spare_width = width - 59;
+
+  if (spare_width < 0) {
+    spare_width = 0;
+  }
+  draw_cell(row, &col, 4, "#/", A_BOLD);
+  draw_cell(row, &col, 8, "note", A_BOLD);
+  draw_cell(row, &col, 9, "state", A_BOLD);
+  draw_cell(row, &col, 9, "velocity", A_BOLD);
+  draw_cell(row, &col, 10, "pressure", A_BOLD);
+  draw_cell(row, &col, 14, "bend/mod", A_BOLD);
+  draw_cell(row, &col, 5 + spare_width, "age", A_BOLD);
+}
+
+static void draw_live_player_panel(const TuiRenderState *state,
+                                   const TuiRect *rect) {
+  int inner_left = rect->left + 1;
+  int inner_width = rect->width - 2;
+  int visible = rect->height - 3;
+  int title_attr = state->focus == TUI_RENDER_FOCUS_WORK_PANE ? A_BOLD : 0;
+
+  draw_clipped_text(rect->top, inner_left, inner_width,
+                    work_pane_mode_text(state->work_pane_mode), title_attr);
+  draw_live_player_header(rect->top + 1, inner_left, inner_width);
+  if (visible <= 0) {
+    return;
+  }
+
+  for (int row = 0; row < visible; ++row) {
+    int screen_row = rect->top + 2 + row;
+    int col = inner_left;
+    const TuiRenderLiveNoteRow *note_row;
+    int attrs;
+
+    move(screen_row, inner_left);
+    clrtoeol();
+    if (state->live_notes == NULL || (size_t)row >= state->live_note_count) {
+      continue;
+    }
+
+    note_row = &state->live_notes[row];
+    attrs = note_row->active ? category_attrs(note_row->category) : A_DIM;
+    draw_cell(screen_row, &col, 4, note_row->number, attrs);
+    draw_cell(screen_row, &col, 8, note_row->note, attrs);
+    draw_cell(screen_row, &col, 9, note_row->state, attrs);
+    draw_cell(screen_row, &col, 9, note_row->velocity, attrs);
+    draw_cell(screen_row, &col, 10, note_row->pressure, attrs);
+    draw_cell(screen_row, &col, 14, note_row->bend_mod, attrs);
+    draw_cell(screen_row, &col, inner_left + inner_width - col, note_row->age,
+              attrs);
+  }
+
+  if (state->live_note_count == 0) {
+    mvaddnstr(rect->top + 2, inner_left, "No recent note activity",
+              inner_width);
+  }
+}
+
+static void draw_work_panel(const TuiRenderState *state, const TuiRect *rect) {
+  switch (state->work_pane_mode) {
+  case TUI_RENDER_WORK_PANE_SEQUENCE:
+    draw_sequence_panel(state, rect);
+    break;
+  case TUI_RENDER_WORK_PANE_LIVE_PLAYER:
+    draw_live_player_panel(state, rect);
+    break;
+  case TUI_RENDER_WORK_PANE_LIVE_DIAGNOSTIC:
+    draw_live_diagnostic_panel(state, rect);
+    break;
+  }
+}
+
+static void draw_footer(const TuiRenderState *state, const TuiLayout *layout) {
+  mvhline(layout->footer.top - 1, 0, ACS_HLINE, layout->footer.width);
+  draw_clipped_text(layout->footer.top, 2, layout->footer.width - 4,
+                    text_or_empty(state->footer), A_BOLD);
+}
+
+static void draw_box_rect(const TuiRect *rect) {
+  mvhline(rect->top, rect->left, ACS_HLINE, rect->width);
+  mvhline(rect->top + rect->height - 1, rect->left, ACS_HLINE, rect->width);
+  mvvline(rect->top, rect->left, ACS_VLINE, rect->height);
+  mvvline(rect->top, rect->left + rect->width - 1, ACS_VLINE, rect->height);
+  mvaddch(rect->top, rect->left, ACS_ULCORNER);
+  mvaddch(rect->top, rect->left + rect->width - 1, ACS_URCORNER);
+  mvaddch(rect->top + rect->height - 1, rect->left, ACS_LLCORNER);
+  mvaddch(rect->top + rect->height - 1, rect->left + rect->width - 1,
+          ACS_LRCORNER);
+}
+
+static void draw_settings_overlay(const TuiRenderState *state,
+                                  const TuiRect *rect) {
+  const char *labels[] = {"Recordings directory",
+                          "Middle C",
+                          "Note format",
+                          "Live fade",
+                          "Tempo",
+                          "Metronome"};
+  const char *values[] = {text_or_empty(state->settings.recordings_dir),
+                          text_or_empty(state->settings.middle_c),
+                          text_or_empty(state->settings.note_format),
+                          text_or_empty(state->settings.fade_timeout),
+                          text_or_empty(state->settings.tempo),
+                          text_or_empty(state->settings.metronome)};
+  int count = (int)(sizeof(labels) / sizeof(labels[0]));
+
+  draw_box_rect(rect);
+  draw_clipped_text(rect->top + 1, rect->left + 2, rect->width - 4, "Settings",
+                    A_BOLD);
+  for (int i = 0; i < count && i + 3 < rect->height; ++i) {
+    int row = rect->top + 3 + i;
+    int attr = i == state->settings.selected_index ? A_REVERSE : 0;
+    char line[192];
+
+    snprintf(line, sizeof(line), "%-22s %s", labels[i], values[i]);
+    draw_clipped_text(row, rect->left + 2, rect->width - 4, line, attr);
+  }
+}
+
+static void draw_directory_overlay(const TuiRenderState *state,
+                                   const TuiRect *rect) {
+  draw_box_rect(rect);
+  draw_clipped_text(rect->top + 1, rect->left + 2, rect->width - 4,
+                    "Directory Browser", A_BOLD);
+  draw_clipped_text(rect->top + 3, rect->left + 2, rect->width - 4,
+                    text_or_empty(state->directory_overlay_message), 0);
+  draw_clipped_text(rect->top + 5, rect->left + 2, rect->width - 4,
+                    "Phase 9 owns column navigation and apply flow.", A_DIM);
+  draw_clipped_text(rect->top + 7, rect->left + 2, rect->width - 4,
+                    "Press enter or o to set a manual path.", A_DIM);
+}
+
+static void draw_overlay(const TuiRenderState *state, const TuiLayout *layout) {
+  if (state->overlay == TUI_RENDER_OVERLAY_SETTINGS) {
+    draw_settings_overlay(state, &layout->overlay);
+  } else if (state->overlay == TUI_RENDER_OVERLAY_DIRECTORY) {
+    draw_directory_overlay(state, &layout->overlay);
+  }
 }
 
 void tui_render_setup_colors(void) {
@@ -215,19 +622,15 @@ void tui_render_setup_colors(void) {
   init_pair(TUI_COLOR_CONTROL, COLOR_YELLOW, -1);
   init_pair(TUI_COLOR_PROGRAM, COLOR_MAGENTA, -1);
   init_pair(TUI_COLOR_BEND, COLOR_BLUE, -1);
-  init_pair(TUI_COLOR_SYSTEM, COLOR_WHITE, -1);
   init_pair(TUI_COLOR_WARNING, COLOR_RED, -1);
+  init_pair(TUI_COLOR_RECORDING, COLOR_RED, -1);
+  init_pair(TUI_COLOR_PLAYBACK, COLOR_GREEN, -1);
 }
 
 void tui_render(const TuiRenderState *state) {
   int rows;
   int cols;
-  int top;
-  int file_width;
-  int event_left;
-  int content_height;
-  int log_top;
-  int log_height = 8;
+  TuiLayout layout;
 
   if (state == NULL) {
     return;
@@ -241,20 +644,14 @@ void tui_render(const TuiRenderState *state) {
     return;
   }
 
-  draw_header(state, cols);
-  top = 5;
-  content_height = rows - top - log_height - 2;
-  file_width = cols / 3;
-  if (file_width < 28) {
-    file_width = 28;
-  }
-  event_left = file_width + 1;
-  log_top = top + content_height + 1;
-
-  mvvline(top, file_width, ACS_VLINE, content_height);
-  draw_files_panel(state, top, 0, file_width, content_height);
-  draw_events_panel(state, top, event_left, cols - event_left, content_height);
-  draw_log_panel(state, log_top, 0, cols, log_height);
-  draw_footer(state, rows - 1, cols);
+  layout = calculate_layout(rows, cols);
+  draw_status_rail(state, &layout);
+  draw_command_strip(state, &layout);
+  mvvline(layout.file_pane.top, layout.file_pane.width, ACS_VLINE,
+          layout.file_pane.height);
+  draw_files_panel(state, &layout.file_pane);
+  draw_work_panel(state, &layout.work_pane);
+  draw_footer(state, &layout);
+  draw_overlay(state, &layout);
   refresh();
 }

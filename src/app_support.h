@@ -13,6 +13,7 @@
 
 extern volatile sig_atomic_t g_stop_requested;
 
+const char *app_version(void);
 void on_sigint(int signal_number);
 void log_osstatus_error(const char *label, OSStatus status);
 uint64_t host_time_now_nanos(void);

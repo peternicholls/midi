@@ -8,6 +8,14 @@
 volatile sig_atomic_t g_stop_requested = 0;
 static const uint64_t kActivityFlashNanos = 150000000ULL;
 
+#ifndef APP_VERSION
+#define APP_VERSION "dev"
+#endif
+
+static const char kAppVersion[] = APP_VERSION;
+
+const char *app_version(void) { return kAppVersion; }
+
 static int cfstring_to_utf8(CFStringRef value, char *buffer,
                             size_t buffer_size) {
   if (buffer == NULL || buffer_size == 0) {

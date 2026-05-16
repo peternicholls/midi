@@ -4,6 +4,7 @@
 #include <stdarg.h>
 #include <stdio.h>
 #include <stdlib.h>
+#include <string.h>
 
 struct TuiLog {
   pthread_mutex_t mutex;
@@ -33,15 +34,12 @@ void tui_log_destroy(TuiLog *log) {
   free(log);
 }
 
-int tui_log_vappend(TuiLog *log, const char *format, va_list args) {
-  char line[TUI_LOG_LINE_LENGTH];
+static int tui_log_append_entry(TuiLog *log, const TuiLogEntry *entry) {
   size_t slot;
 
-  if (log == NULL || format == NULL) {
+  if (log == NULL || entry == NULL) {
     return 0;
   }
-
-  vsnprintf(line, sizeof(line), format, args);
 
   pthread_mutex_lock(&log->mutex);
   slot = (log->start + log->count) % TUI_LOG_CAPACITY;
@@ -51,10 +49,21 @@ int tui_log_vappend(TuiLog *log, const char *format, va_list args) {
   } else {
     log->count += 1;
   }
-  snprintf(log->entries[slot].line, sizeof(log->entries[slot].line), "%s",
-           line);
+  log->entries[slot] = *entry;
   pthread_mutex_unlock(&log->mutex);
   return 1;
+}
+
+int tui_log_vappend(TuiLog *log, const char *format, va_list args) {
+  TuiLogEntry entry;
+
+  if (log == NULL || format == NULL) {
+    return 0;
+  }
+
+  memset(&entry, 0, sizeof(entry));
+  vsnprintf(entry.line, sizeof(entry.line), format, args);
+  return tui_log_append_entry(log, &entry);
 }
 
 int tui_log_append(TuiLog *log, const char *format, ...) {
@@ -65,6 +74,21 @@ int tui_log_append(TuiLog *log, const char *format, ...) {
   result = tui_log_vappend(log, format, args);
   va_end(args);
   return result;
+}
+
+int tui_log_append_midi(TuiLog *log, const TuiLogMidiFields *fields,
+                        const char *line) {
+  TuiLogEntry entry;
+
+  if (log == NULL || fields == NULL || line == NULL) {
+    return 0;
+  }
+
+  memset(&entry, 0, sizeof(entry));
+  snprintf(entry.line, sizeof(entry.line), "%s", line);
+  entry.has_midi_fields = true;
+  entry.midi = *fields;
+  return tui_log_append_entry(log, &entry);
 }
 
 size_t tui_log_snapshot(TuiLog *log, TuiLogEntry *out_entries,

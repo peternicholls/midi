@@ -736,6 +736,15 @@ Verification:
 
 ## Verification
 
+Implementation evidence captured 2026-05-16:
+
+- `make clean && make && make test` passed after implementing the renderer,
+  log, and TUI command-loop changes.
+- A scripted 120x24 TUI smoke check rendered the Signal Desk status rail,
+  command strip, persistent Recordings pane, Sequence work pane, and footer.
+- Directory-browser scope remains intentionally limited to the Phase 9 entry
+  overlay and manual-path escape hatch.
+
 - [ ] `make clean`
 - [ ] `make`
 - [ ] `make test`
