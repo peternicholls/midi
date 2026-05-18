@@ -34,6 +34,7 @@ usable.
 - [Phase 7: Renderer Isolation](tui-refactor-sprints/phase-07-renderer-isolation.md)
 - [Phase 8: TUI Visual And UX Redesign](tui-refactor-sprints/phase-08-tui-visual-ux-redesign.md)
 - [Phase 8 Delivery Plan: TUI UX Redesign](tui-refactor-sprints/phase-08-delivery-plan.md)
+- [Phase 8 Remediation Plan: Close Post-Implementation Gaps](tui-refactor-sprints/phase-08-remediation-plan.md)
 - [Phase 9: Directory Browser Flow](tui-refactor-sprints/phase-09-directory-browser-flow.md)
 - [Phase 10: Command Cleanup And Architecture Pass](tui-refactor-sprints/phase-10-command-cleanup-architecture.md)
 - [Phase 11: Final Verification And Release Readiness](tui-refactor-sprints/phase-11-final-verification-release.md)
