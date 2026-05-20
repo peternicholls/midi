@@ -59,6 +59,15 @@ typedef struct TuiRenderLiveNoteRow {
   bool active;
 } TuiRenderLiveNoteRow;
 
+typedef struct TuiRenderLiveControlRow {
+  char scope[TUI_RENDER_FIELD_TEXT_LENGTH];
+  char modulation[TUI_RENDER_FIELD_TEXT_LENGTH];
+  char pressure[TUI_RENDER_FIELD_TEXT_LENGTH];
+  char pitch[TUI_RENDER_FIELD_TEXT_LENGTH];
+  char last_rx[TUI_RENDER_FIELD_TEXT_LENGTH];
+  bool active;
+} TuiRenderLiveControlRow;
+
 typedef struct TuiRenderSettingsState {
   int selected_index;
   const char *recordings_dir;
@@ -97,6 +106,7 @@ typedef struct TuiRenderState {
 
   const TuiRenderLiveNoteRow *live_notes;
   size_t live_note_count;
+  TuiRenderLiveControlRow live_controls;
 
   TuiRenderOverlayKind overlay;
   TuiRenderSettingsState settings;
