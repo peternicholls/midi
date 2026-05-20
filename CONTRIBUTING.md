@@ -20,7 +20,7 @@ make
 make test
 ```
 
-Use `./midi-capture --version` to confirm the binary was built with the version
+Use `./midi --version` to confirm the binary was built with the version
 from `VERSION`.
 
 ## Before Opening A Pull Request

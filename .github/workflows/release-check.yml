@@ -45,5 +45,5 @@ jobs:
       - name: Version smoke test
         run: |
           expected="$(tr -d '[:space:]' < VERSION)"
-          actual="$(./midi-capture --version)"
-          test "$actual" = "midi-capture $expected"
+          actual="$(./midi --version)"
+          test "$actual" = "midi $expected"

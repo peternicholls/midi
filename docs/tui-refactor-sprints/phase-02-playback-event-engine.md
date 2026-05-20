@@ -61,7 +61,7 @@ Remove duplicated playback event collection from `command_play.c` and
 - [x] `make clean`
 - [x] `make`
 - [x] `make test`
-- [x] `./midi-capture play <fixture.mid> <destination-index>`
+- [x] `./midi play <fixture.mid> <destination-index>`
 - [x] TUI can load a selected `.mid` file and show its events.
 
 Evidence:
@@ -77,7 +77,7 @@ Evidence:
   `midi_sequence_load_events_from_file` instead of owning playback event
   extraction.
 - `make clean && make && make test` passed after the extraction.
-- `./midi-capture play recordings/20260512040548.mid 0` completed against
+- `./midi play recordings/20260512040548.mid 0` completed against
   destination `[0] KeyLab 88`.
 - Scripted TUI smoke at 120x30 loaded `20260512040548.mid`, showed the Sequence
   panel with event count, connected `MON source[0] KeyLab 88`, and quit cleanly.

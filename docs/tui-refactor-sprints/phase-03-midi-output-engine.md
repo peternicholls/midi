@@ -55,7 +55,7 @@ Evidence:
 - `command_play.c` and `command_tui.c` now share `midi_output_open`,
   `midi_output_close`, and `midi_output_send`.
 - `make clean && make && make test` passed.
-- `./midi-capture play recordings/20260512040548.mid 0` completed against
+- `./midi play recordings/20260512040548.mid 0` completed against
   destination `[0] KeyLab 88`.
 - TUI smoke showed destination `[0] KeyLab 88` and still loaded the selected
   recording.

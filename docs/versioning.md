@@ -64,7 +64,7 @@ git push origin v0.1.0
 Before creating a tag, confirm the built binary reports the same version:
 
 ```sh
-./midi-capture --version
+./midi --version
 ```
 
 ## GitHub Releases
@@ -138,7 +138,7 @@ gh release create v0.2.0-rc.1 \
    `docs/tui-refactor-sprints/phase-11-final-verification-release.md` when the
    release changes CLI, playback, recording, or TUI behavior.
 6. Commit the release changes using the Lore Commit Protocol.
-7. Verify `./midi-capture --version` prints the release version.
+7. Verify `./midi --version` prints the release version.
 8. Create an annotated tag named `vX.Y.Z`.
 9. Push the release commit and tag to GitHub.
 10. Wait for the tag's `Release Check` workflow to pass.

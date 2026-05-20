@@ -75,7 +75,7 @@ Evidence:
 - Added `tests/test_midi_recorder.c` covering recorder init, direct channel
   insertion, and supported-vs-ignored packet counting.
 - `make clean && make` passed after the extraction.
-- `make midi-capture test_midi_recorder && ./test_midi_recorder` passed.
+- `make midi test_midi_recorder && ./test_midi_recorder` passed.
 - `make test` passed after the extraction.
 - Scripted TUI smoke in a 120x30 terminal started recording, toggled pause and
   resume, stopped, and quit cleanly. It created

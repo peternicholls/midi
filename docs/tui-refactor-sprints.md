@@ -119,7 +119,7 @@ Acceptance criteria:
 - `command_play.c` no longer owns its own playback event list implementation.
 - `command_tui.c` no longer duplicates sequence event extraction.
 - `make test` passes.
-- `./midi-capture play <fixture.mid>` still plays through the selected
+- `./midi play <fixture.mid>` still plays through the selected
   destination in manual testing.
 
 ## Phase 3: MIDI Output Engine
@@ -352,10 +352,10 @@ Verification checklist:
 - `make clean`
 - `make`
 - `make test`
-- `./midi-capture list`
-- `./midi-capture record <path> <short-duration> <source-index>`
-- `./midi-capture play <path> <destination-index>`
-- `./midi-capture tui <recordings-dir>`
+- `./midi list`
+- `./midi record <path> <short-duration> <source-index>`
+- `./midi play <path> <destination-index>`
+- `./midi tui <recordings-dir>`
 - No-device degradation: with no MIDI source or destination available, CLI and
   TUI paths show readable errors/status and do not crash or hang.
 - TUI manual checks:

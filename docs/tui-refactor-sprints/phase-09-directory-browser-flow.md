@@ -65,7 +65,7 @@ user choose a valid recordings directory.
 ## Exit Criteria
 
 - Users no longer need to guess what to type for output directory changes.
-- Existing `./midi-capture tui <recordings-dir>` startup behavior still works.
+- Existing `./midi tui <recordings-dir>` startup behavior still works.
 - Directory changes trigger file list refresh and selected-file reload.
 
 ## Risks

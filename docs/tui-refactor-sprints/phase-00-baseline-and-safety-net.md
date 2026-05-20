@@ -20,10 +20,10 @@ evidence that later extractions are refactors, not accidental rewrites.
 ## Tasks
 
 - [x] Inventory current command behavior:
-  - `./midi-capture list`
-  - `./midi-capture record <path> [seconds] [source-index]`
-  - `./midi-capture play <path> [destination-index]`
-  - `./midi-capture tui [recordings-dir]`
+  - `./midi list`
+  - `./midi record <path> [seconds] [source-index]`
+  - `./midi play <path> [destination-index]`
+  - `./midi tui [recordings-dir]`
 - [x] Create a manual smoke-test checklist for hardware-dependent behavior.
 - [x] Extend tests for existing pure helpers:
   - MIDI filename filtering

@@ -36,10 +36,10 @@ Prove the refactor is complete, documented, and ready to merge or release.
 - [ ] `make clean`
 - [ ] `make`
 - [ ] `make test`
-- [ ] `./midi-capture list`
-- [ ] `./midi-capture record <path> <short-duration> <source-index>`
-- [ ] `./midi-capture play <path> <destination-index>`
-- [ ] `./midi-capture tui <recordings-dir>`
+- [ ] `./midi list`
+- [ ] `./midi record <path> <short-duration> <source-index>`
+- [ ] `./midi play <path> <destination-index>`
+- [ ] `./midi tui <recordings-dir>`
 
 ## TUI Manual Checks
 

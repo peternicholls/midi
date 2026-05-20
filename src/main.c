@@ -7,6 +7,10 @@
 #include <stdio.h>
 #include <string.h>
 
+#ifndef APP_NAME
+#define APP_NAME "midi"
+#endif
+
 static void print_usage(const char *program_name) {
   fprintf(stderr,
           "Usage:\n"
@@ -15,8 +19,7 @@ static void print_usage(const char *program_name) {
           "  %s tui [recordings-dir]\n"
           "  %s record <output.mid> [seconds] [source-index]\n"
           "  %s play <input.mid> [destination-index]\n",
-          program_name, program_name, program_name, program_name,
-          program_name);
+          program_name, program_name, program_name, program_name, program_name);
 }
 
 static int handle_record_command(int argc, char **argv) {
@@ -40,7 +43,7 @@ static int handle_play_command(int argc, char **argv) {
 
 static int dispatch_command(int argc, char **argv) {
   if (strcmp(argv[1], "--version") == 0 || strcmp(argv[1], "version") == 0) {
-    printf("midi-capture %s\n", app_version());
+    printf("%s %s\n", APP_NAME, app_version());
     return 0;
   }
 

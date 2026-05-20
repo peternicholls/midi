@@ -303,10 +303,10 @@ Tasks:
 
 - [x] Try to identify a reliable scripted TUI capture path for the local
       environment.
-- [x] Prefer a flow that builds `midi-capture`, runs the TUI at fixed terminal
+- [x] Prefer a flow that builds `midi`, runs the TUI at fixed terminal
       sizes, captures output or screenshots, and compares visible text manually
-      against V3. _Path:_ `script -q /tmp/midi-tui.log zsh -lc "printf 'q' |
-      TERM=xterm ./midi-capture tui recordings"` _then_ `grep -a` _expected
+  against V3. _Path:_ `script -q /tmp/midi-tui.log zsh -lc "printf 'q' |
+  TERM=xterm ./midi tui recordings"` _then_ `grep -a` _expected
       text._
 - [x] If scripted capture is not reliable, record manual verification as
       required.
@@ -1011,7 +1011,7 @@ Tasks:
 - Run `git status --short` and preserve existing untracked or user-owned files.
 - Run `make clean`, `make`, and `make test` before code changes if time allows.
 - Confirm whether the current environment can run a scripted TUI capture:
-  `TERM=xterm ./midi-capture tui <recordings-dir>` under `script` or an
+  `TERM=xterm ./midi tui <recordings-dir>` under `script` or an
   equivalent terminal capture.
 - If a scripted capture is not reliable, record that as a manual verification
   gap and still run the build/test suite.
@@ -1421,7 +1421,7 @@ R4.1, R4.2, R5.1, R5.2, R5.3, R5.4, R6.1, R6.2, R6.3, R6.4.
   `test_midi_sequence`, `test_status_line`, `test_tui_files`, `test_tui_log`,
   `test_tui_model`).
 - `git diff --check` — no whitespace errors.
-- TUI smoke (`script -q ... ./midi-capture tui recordings`) at 90×24
+- TUI smoke (`script -q ... ./midi tui recordings`) at 90×24
   confirmed: status rail renders `MIDI Capture` `IDLE` `RX.` `TX.`
   `SRC [0] <name>` `DST [0] <name>` with version pinned right, file pane
   titled `Files`, work pane titled `SEQUENCE`, command strip text per-mode.

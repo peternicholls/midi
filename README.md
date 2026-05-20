@@ -44,25 +44,25 @@ make
 List available MIDI ports:
 
 ```sh
-./midi-capture list
+./midi list
 ```
 
 Record MIDI from source `0` for 10 seconds:
 
 ```sh
-./midi-capture record take.mid 10 0
+./midi record take.mid 10 0
 ```
 
 Play that file back to destination `0`:
 
 ```sh
-./midi-capture play take.mid 0
+./midi play take.mid 0
 ```
 
 Open the terminal UI:
 
 ```sh
-./midi-capture tui recordings
+./midi tui recordings
 ```
 
 ## Common Workflows
@@ -72,7 +72,7 @@ Open the terminal UI:
 Connect the device, then run:
 
 ```sh
-./midi-capture list
+./midi list
 ```
 
 If macOS exposes the device through CoreMIDI, it appears under `Sources`,
@@ -83,13 +83,13 @@ If macOS exposes the device through CoreMIDI, it appears under `Sources`,
 Record to a named file for a fixed duration:
 
 ```sh
-./midi-capture record take.mid 10 0
+./midi record take.mid 10 0
 ```
 
 Record until you press `Ctrl-C`:
 
 ```sh
-./midi-capture record take.mid
+./midi record take.mid
 ```
 
 During recording, the terminal shows elapsed time and an `RX.` flash when MIDI
@@ -100,7 +100,7 @@ arrives.
 Send a `.mid` file to a destination:
 
 ```sh
-./midi-capture play take.mid 0
+./midi play take.mid 0
 ```
 
 During playback, the terminal shows elapsed time, total time, and a `TX.` flash
@@ -111,7 +111,7 @@ when MIDI is sent.
 Launch the TUI with a dedicated recordings folder:
 
 ```sh
-./midi-capture tui recordings
+./midi tui recordings
 ```
 
 The TUI shows your recordings, the MIDI events in the selected file, and live
@@ -143,7 +143,7 @@ Useful keys:
 Print the application version:
 
 ```sh
-./midi-capture --version
+./midi --version
 ```
 
 Release versioning, git tag, and GitHub Release rules are documented in
