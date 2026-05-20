@@ -10,12 +10,12 @@ to move the curses UI closer to the intended design.
 
 ## Evidence Reviewed
 
-- `docs/tui-refactor-sprints/phase-08-mockups-v3/index.html`
-- `docs/tui-refactor-sprints/phase-08-mockups-v3/styles.css`
-- `docs/tui-refactor-sprints/phase-08-tui-visual-ux-redesign.md`
-- `docs/tui-refactor-sprints/phase-08-delivery-plan.md`
-- `docs/tui-refactor-sprints/phase-08-gap-analysis.md`
-- `docs/tui-refactor-sprints/phase-08-remediation-plan.md`
+- `docs/tui-refactor-sprints/phase-08-supporting-docs/phase-08-mockups-v3/index.html`
+- `docs/tui-refactor-sprints/phase-08-supporting-docs/phase-08-mockups-v3/styles.css`
+- `docs/tui-refactor-sprints/phase-08-supporting-docs/phase-08-tui-visual-ux-redesign.md`
+- `docs/tui-refactor-sprints/phase-08-supporting-docs/phase-08-delivery-plan.md`
+- `docs/tui-refactor-sprints/phase-08-supporting-docs/phase-08-gap-analysis.md`
+- `docs/tui-refactor-sprints/phase-08-supporting-docs/phase-08-remediation-plan.md`
 - `src/tui_render.c`
 - `src/tui_render.h`
 - `src/command_tui.c`

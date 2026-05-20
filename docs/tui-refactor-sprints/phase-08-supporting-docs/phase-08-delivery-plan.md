@@ -13,7 +13,7 @@ the engineering plan for sequencing the work.
 ## Planning Constraints
 
 - Keep the Signal Desk visual direction from the redesign brief.
-- Use `docs/tui-refactor-sprints/phase-08-mockups-v3/index.html` as the
+- Use `docs/tui-refactor-sprints/phase-08-supporting-docs/phase-08-mockups-v3/index.html` as the
       primary layout reference for the full-height file pane and right-side
       mode-aware work pane.
 - Preserve the compact supported minimum of 90x20 while treating 90x24 as the

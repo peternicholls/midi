@@ -24,37 +24,37 @@ V3 mockups in small, reviewable changes:
 
 Use these inputs together:
 
-- `docs/tui-refactor-sprints/phase-08-gap-analysis.md`
+- `docs/tui-refactor-sprints/phase-08-supporting-docs/phase-08-gap-analysis.md`
   - Prioritised gaps are listed under "High", "Medium", and "Low".
   - Key gaps: `#/` lacks `/total`, Live Player lacks the channel-scope row,
     settings lacks the notes column, compact mode is a stub, and the Phase 8 docs
     still report stale status.
-- `docs/tui-refactor-sprints/phase-08-delivery-plan.md`
+- `docs/tui-refactor-sprints/phase-08-supporting-docs/phase-08-delivery-plan.md`
   - P8A-P8E remain the intended engineering structure.
   - The plan requires 90x20 support, 90x24 preferred behavior, a persistent file
     pane, mode-aware work pane, and verification after each slice.
-- `docs/tui-refactor-sprints/phase-08-tui-visual-ux-redesign.md`
+- `docs/tui-refactor-sprints/phase-08-supporting-docs/phase-08-tui-visual-ux-redesign.md`
   - The approved visual direction is Signal Desk.
   - Treat mockups as visual direction, not as a demand for non-portable terminal
     styling.
-- `docs/tui-refactor-sprints/phase-08-mockups-v3/index.html`
+- `docs/tui-refactor-sprints/phase-08-supporting-docs/phase-08-mockups-v3/index.html`
   - Primary visual reference for Sequence, Live Player, Live Diagnostic,
     Settings, and Directory placeholder states.
-- `docs/tui-refactor-sprints/phase-08-mockups-v3/styles.css`
+- `docs/tui-refactor-sprints/phase-08-supporting-docs/phase-08-mockups-v3/styles.css`
   - Primary reference for column proportions, status rail compactness, and
     semantic color intent.
-- `docs/tui-refactor-sprints/phase-08-mockups-v3/Phase 8 TUI Mockups V3.pdf`
+- `docs/tui-refactor-sprints/phase-08-supporting-docs/phase-08-mockups-v3/Phase 8 TUI Mockups V3.pdf`
   - One-page rendered mockup export. Use it as an extra visual cross-check when
     the browser/HTML rendering is unavailable or when the implementation agent
     wants a single static artifact for review.
-- `docs/tui-refactor-sprints/phase-08-review-claude-sonnet.md`
+- `docs/tui-refactor-sprints/phase-08-supporting-docs/phase-08-review-claude-sonnet.md`
   - Historical implementation-risk review. Use only where it explains why the
     current implementation chose a particular architecture; V3 and the gap
     analysis supersede early open questions.
 - Older Phase 8 mockups:
-  - `docs/tui-refactor-sprints/phase-08-mockups-codex/index.html`
-  - `docs/tui-refactor-sprints/phase-08-mockups-gemini/index.html`
-  - `docs/tui-refactor-sprints/phase-08-mockups-v2/index.html`
+  - `docs/tui-refactor-sprints/phase-08-supporting-docs/phase-08-mockups-codex/index.html`
+  - `docs/tui-refactor-sprints/phase-08-supporting-docs/phase-08-mockups-gemini/index.html`
+  - `docs/tui-refactor-sprints/phase-08-supporting-docs/phase-08-mockups-v2/index.html`
   - These are useful history only. Do not let them override V3.
 - Current implementation files:
   - `src/tui_render.c`
@@ -254,9 +254,9 @@ Exit criteria:
 
 Files:
 
-- `docs/tui-refactor-sprints/phase-08-mockups-v3/index.html`
-- `docs/tui-refactor-sprints/phase-08-mockups-v3/styles.css`
-- `docs/tui-refactor-sprints/phase-08-mockups-v3/Phase 8 TUI Mockups V3.pdf`
+- `docs/tui-refactor-sprints/phase-08-supporting-docs/phase-08-mockups-v3/index.html`
+- `docs/tui-refactor-sprints/phase-08-supporting-docs/phase-08-mockups-v3/styles.css`
+- `docs/tui-refactor-sprints/phase-08-supporting-docs/phase-08-mockups-v3/Phase 8 TUI Mockups V3.pdf`
 
 Tasks:
 
@@ -851,7 +851,7 @@ verification are complete.
 
 Files:
 
-- `docs/tui-refactor-sprints/phase-08-tui-visual-ux-redesign.md`
+- `docs/tui-refactor-sprints/phase-08-supporting-docs/phase-08-tui-visual-ux-redesign.md`
 
 References:
 
@@ -871,7 +871,7 @@ Exit criteria:
 
 Files:
 
-- `docs/tui-refactor-sprints/phase-08-delivery-plan.md`
+- `docs/tui-refactor-sprints/phase-08-supporting-docs/phase-08-delivery-plan.md`
 
 References:
 
@@ -891,7 +891,7 @@ Exit criteria:
 
 Files:
 
-- `docs/tui-refactor-sprints/phase-08-gap-analysis.md`
+- `docs/tui-refactor-sprints/phase-08-supporting-docs/phase-08-gap-analysis.md`
 
 Tasks:
 
@@ -1289,18 +1289,18 @@ Goal: make Phase 8 docs reflect the actual implementation and remediation state.
 
 Tasks:
 
-- Update `docs/tui-refactor-sprints/phase-08-tui-visual-ux-redesign.md`:
+- Update `docs/tui-refactor-sprints/phase-08-supporting-docs/phase-08-tui-visual-ux-redesign.md`:
   - Change `**Status:** Not started` to the correct post-remediation status.
     Use `Implemented` only if the remediation code has landed and verification
     evidence is recorded.
   - Add a short remediation evidence note under the existing Verification
     section.
   - Keep the Phase 9 directory-browser limitation explicit.
-- Update `docs/tui-refactor-sprints/phase-08-delivery-plan.md`:
+- Update `docs/tui-refactor-sprints/phase-08-supporting-docs/phase-08-delivery-plan.md`:
   - Mark completed P8A-P8E checkboxes only after verification.
   - If a task remains deliberately deferred, annotate it rather than silently
     checking it off.
-- Update `docs/tui-refactor-sprints/phase-08-gap-analysis.md` or create a short
+- Update `docs/tui-refactor-sprints/phase-08-supporting-docs/phase-08-gap-analysis.md` or create a short
   follow-up note:
   - Mark remediated gaps with evidence.
   - Leave unresolved gaps explicit with owner/phase.

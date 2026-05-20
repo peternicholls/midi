@@ -647,11 +647,11 @@ Verification:
 - `src/app_support.h`
 - Phase 5 MIDI description categories
 - Phase 7 renderer isolation
-- Static mockups in `docs/tui-refactor-sprints/phase-08-mockups-codex/`
-- Static mockups in `docs/tui-refactor-sprints/phase-08-mockups-gemini/`
-- Static mockups in `docs/tui-refactor-sprints/phase-08-mockups-v2/`
-- Static mockups in `docs/tui-refactor-sprints/phase-08-mockups-v3/`
-- Design review notes in `docs/tui-refactor-sprints/phase-08-review-claude-sonnet.md`
+- Static mockups in `docs/tui-refactor-sprints/phase-08-supporting-docs/phase-08-mockups-codex/`
+- Static mockups in `docs/tui-refactor-sprints/phase-08-supporting-docs/phase-08-mockups-gemini/`
+- Static mockups in `docs/tui-refactor-sprints/phase-08-supporting-docs/phase-08-mockups-v2/`
+- Static mockups in `docs/tui-refactor-sprints/phase-08-supporting-docs/phase-08-mockups-v3/`
+- Design review notes in `docs/tui-refactor-sprints/phase-08-supporting-docs/phase-08-review-claude-sonnet.md`
 - future `src/tui_settings.c` if settings are split out
 - future `src/tui_settings.h` if settings are split out
 
