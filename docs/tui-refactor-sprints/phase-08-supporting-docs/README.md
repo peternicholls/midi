@@ -26,6 +26,7 @@ These documents provide rationale, historical investigation, or prior planning
 context, but they are not the primary execution surface for the sprint:
 
 - `phase-08-mockup-parity-investigation.md`
+- `phase-08-slice-plan-evaluation.md`
 - `phase-08-remediation-plan.md`
 - `phase-08-gap-analysis.md`
 - `phase-08-delivery-plan.md`

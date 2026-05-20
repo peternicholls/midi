@@ -13,6 +13,9 @@ parity checklist.
 This file stays at the top level of `docs/tui-refactor-sprints/` as the active
 Phase 8 working document.
 
+Use `phase-08-imperative-implementation-tasks.md` as the execution companion
+when a slice needs explicit imperative tasks rather than planning language.
+
 All supporting Phase 8 material now lives in:
 
 - `phase-08-supporting-docs/`
@@ -25,6 +28,7 @@ Essential sprint inputs:
 - `phase-08-supporting-docs/tui-c-interop-language.md`
 - `phase-08-supporting-docs/phase-08-detailed-design-plan.md`
 - `phase-08-supporting-docs/phase-08-mockups-v3/`
+- `phase-08-imperative-implementation-tasks.md`
 
 ## How To Use This Plan
 

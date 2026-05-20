@@ -56,17 +56,19 @@ static TuiLayout calculate_layout(int rows, int cols) {
   int overlay_height;
 
   memset(&layout, 0, sizeof(layout));
-  layout.compact = rows < 24;
+  /* 90x24 is the compact review target per the screen contracts. */
+  layout.compact = rows <= 24;
   layout.status_rail = (TuiRect){0, 0, cols, 1};
   layout.command_strip = (TuiRect){1, 0, cols, 1};
   layout.footer = (TuiRect){rows - 1, 0, cols, 1};
 
   /*
-   * Preferred geometry: 90x24 keeps a 28-column browser and a 57-column work
-   * pane; 120x36 grows the browser to 30 columns; wide terminals cap the
-   * browser at 36 so the work pane receives all additional inspection width.
-   * Compact 90x20-90x23 keeps the same horizontal contract and spends the
-   * reduced height entirely on the two persistent panes.
+   * Preferred geometry: 90x24 is the compact review target; 120x36 is the
+   * wide review target. 120x36 grows the browser to 30 columns; wide
+   * terminals cap the browser at 36 so the work pane receives all additional
+   * inspection width. Compact mode (rows <= 24) keeps the same horizontal
+   * contract and spends the reduced height entirely on the two persistent
+   * panes.
    */
   file_width = clamp_int(cols / 4, 28, 36);
   if (content_bottom < content_top) {
@@ -203,16 +205,19 @@ static void draw_status_rail(const TuiRenderState *state,
   draw_clipped_text(row, col, (int)strlen(brand), brand, A_BOLD);
   col += (int)strlen(brand) + 1;
 
-  /* work-pane mode (colored by mode type); overlay with transport when active */
+  /* work-pane mode (colored by mode type); overlay with transport when active
+   */
   {
     const char *mode_text;
     int m_attr;
     if (state->record_active) {
       mode_text = "RECORDING";
-      m_attr = has_colors() ? (COLOR_PAIR(TUI_COLOR_RECORDING) | A_BOLD) : A_BOLD;
+      m_attr =
+          has_colors() ? (COLOR_PAIR(TUI_COLOR_RECORDING) | A_BOLD) : A_BOLD;
     } else if (state->playback_active) {
       mode_text = "PLAYING";
-      m_attr = has_colors() ? (COLOR_PAIR(TUI_COLOR_PLAYBACK) | A_BOLD) : A_BOLD;
+      m_attr =
+          has_colors() ? (COLOR_PAIR(TUI_COLOR_PLAYBACK) | A_BOLD) : A_BOLD;
     } else {
       mode_text = work_pane_mode_text(state->work_pane_mode);
       m_attr = mode_label_attrs(state->work_pane_mode);
@@ -409,7 +414,8 @@ static void draw_sequence_row(const TuiRenderSequenceRow *event_row,
                               int width) {
   int col = left;
   int attrs = category_attrs(event_row->category);
-  int selected_attrs = event_row->selected ? (attrs | A_BOLD | A_REVERSE) : attrs;
+  int selected_attrs =
+      event_row->selected ? (attrs | A_BOLD | A_REVERSE) : attrs;
   int marker_attr = event_row->selected ? (A_BOLD | A_REVERSE) : A_DIM;
   TuiSequenceWidths w = sequence_widths_for(width);
   int desc_width = sequence_desc_width(&w, width);
@@ -502,7 +508,6 @@ static void draw_sequence_panel(const TuiRenderState *state,
   }
 }
 
-
 static void draw_live_diagnostic_header(int row, int left, int width) {
   int col = left;
   int desc_width = width - 55;
@@ -562,8 +567,7 @@ static void draw_live_diagnostic_panel(const TuiRenderState *state,
   int mode_attr = mode_label_attrs(state->work_pane_mode) | title_attr;
   char right_title[32];
 
-  snprintf(right_title, sizeof(right_title), "last %zu msgs",
-           state->log_count);
+  snprintf(right_title, sizeof(right_title), "last %zu msgs", state->log_count);
   draw_split_title(rect->top, inner_left, inner_width,
                    work_pane_mode_text(state->work_pane_mode), mode_attr,
                    right_title, A_DIM);
