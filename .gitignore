@@ -1,4 +1,5 @@
 .omx/
+.antigravitycli/
 
 /midi
 /test_midi_parser
@@ -9,6 +10,7 @@
 /test_tui_files
 /test_tui_log
 /test_tui_model
+
 
 /output.mid
 
