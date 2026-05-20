@@ -205,6 +205,10 @@ Required slices:
 6. settings and shared polish
 7. verification and signoff
 
+The authoritative slice breakdown now lives in:
+
+- `docs/tui-refactor-sprints/phase-08-contract-driven-implementation-slices.md`
+
 Acceptance criteria:
 
 - each slice has named files, named contract clauses, and named validation
@@ -235,8 +239,9 @@ This planning phase should yield these working artifacts:
 
 1. `phase-08-detailed-design-plan.md`
 2. `phase-08-screen-contracts.md`
-3. a future renderer snapshot plan or test doc when the harness lands
-4. updates to implementation plans only after the contracts are frozen
+3. `phase-08-contract-driven-implementation-slices.md`
+4. a future renderer snapshot plan or test doc when the harness lands
+5. updates to implementation plans only after the contracts are frozen
 
 ## Design Topics That Must Be Frozen Before Coding
 
