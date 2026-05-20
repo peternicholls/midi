@@ -32,13 +32,13 @@ This planning phase is complete only when the project has all of the following:
 
 When references disagree, use this order:
 
-1. `docs/tui-refactor-sprints/phase-08-mockups-v3/index.html`
-2. `docs/tui-refactor-sprints/phase-08-mockups-v3/styles.css`
-3. `docs/tui-refactor-sprints/phase-08-mockups-v3/Phase 8 TUI Mockups V3.pdf`
-4. `docs/tui-refactor-sprints/tui-c-interop-language.md`
-5. `docs/tui-refactor-sprints/phase-08-mockup-parity-investigation.md`
-6. `docs/tui-refactor-sprints/phase-08-remediation-plan.md`
-7. `docs/tui-refactor-sprints/phase-08-tui-visual-ux-redesign.md`
+1. `docs/tui-refactor-sprints/phase-08-supporting-docs/phase-08-mockups-v3/index.html`
+2. `docs/tui-refactor-sprints/phase-08-supporting-docs/phase-08-mockups-v3/styles.css`
+3. `docs/tui-refactor-sprints/phase-08-supporting-docs/phase-08-mockups-v3/Phase 8 TUI Mockups V3.pdf`
+4. `docs/tui-refactor-sprints/phase-08-supporting-docs/tui-c-interop-language.md`
+5. `docs/tui-refactor-sprints/phase-08-supporting-docs/phase-08-mockup-parity-investigation.md`
+6. `docs/tui-refactor-sprints/phase-08-supporting-docs/phase-08-remediation-plan.md`
+7. `docs/tui-refactor-sprints/phase-08-supporting-docs/phase-08-tui-visual-ux-redesign.md`
 
 Reference rules:
 

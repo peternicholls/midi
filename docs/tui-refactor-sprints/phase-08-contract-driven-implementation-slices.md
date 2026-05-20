@@ -8,6 +8,24 @@
 execution slices that are explicitly tied to the frozen screen contracts and the
 parity checklist.
 
+## Working Set
+
+This file stays at the top level of `docs/tui-refactor-sprints/` as the active
+Phase 8 working document.
+
+All supporting Phase 8 material now lives in:
+
+- `phase-08-supporting-docs/`
+- `phase-08-supporting-docs/README.md`
+
+Essential sprint inputs:
+
+- `phase-08-supporting-docs/phase-08-screen-contracts.md`
+- `phase-08-supporting-docs/phase-08-parity-checklist.md`
+- `phase-08-supporting-docs/tui-c-interop-language.md`
+- `phase-08-supporting-docs/phase-08-detailed-design-plan.md`
+- `phase-08-supporting-docs/phase-08-mockups-v3/`
+
 ## How To Use This Plan
 
 Each slice in this document must be implemented with one dominant intention.
@@ -37,6 +55,9 @@ For every slice, the implementation loop is:
    tempting
 
 ## Shared Review Vocabulary
+
+Unless stated otherwise, basename references in this document resolve inside
+`phase-08-supporting-docs/`.
 
 Use these document anchors in every implementation note or review summary:
 

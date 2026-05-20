@@ -6,9 +6,9 @@
 
 **Depends on:**
 
-- `docs/tui-refactor-sprints/phase-08-mockups-v3/index.html`
-- `docs/tui-refactor-sprints/phase-08-mockups-v3/styles.css`
-- `docs/tui-refactor-sprints/tui-c-interop-language.md`
+- `docs/tui-refactor-sprints/phase-08-supporting-docs/phase-08-mockups-v3/index.html`
+- `docs/tui-refactor-sprints/phase-08-supporting-docs/phase-08-mockups-v3/styles.css`
+- `docs/tui-refactor-sprints/phase-08-supporting-docs/tui-c-interop-language.md`
 
 ## Purpose
 

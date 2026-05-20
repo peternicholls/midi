@@ -12,10 +12,10 @@ the V3 mockup intent.
 
 Use these together, in this order:
 
-1. `docs/tui-refactor-sprints/phase-08-screen-contracts.md`
-2. `docs/tui-refactor-sprints/phase-08-mockups-v3/index.html`
-3. `docs/tui-refactor-sprints/phase-08-mockups-v3/styles.css`
-4. `docs/tui-refactor-sprints/phase-08-mockups-v3/Phase 8 TUI Mockups V3.pdf`
+1. `docs/tui-refactor-sprints/phase-08-supporting-docs/phase-08-screen-contracts.md`
+2. `docs/tui-refactor-sprints/phase-08-supporting-docs/phase-08-mockups-v3/index.html`
+3. `docs/tui-refactor-sprints/phase-08-supporting-docs/phase-08-mockups-v3/styles.css`
+4. `docs/tui-refactor-sprints/phase-08-supporting-docs/phase-08-mockups-v3/Phase 8 TUI Mockups V3.pdf`
 
 Use the PDF as a visual cross-check only. Do not use it to invent behavior not
 present in the HTML/CSS or the screen contracts.
