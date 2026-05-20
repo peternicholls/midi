@@ -65,6 +65,15 @@ typedef struct TuiLiveNoteState {
   uint64_t last_seen_nanos;
 } TuiLiveNoteState;
 
+typedef struct TuiLiveChannelState {
+  bool seen;
+  uint8_t channel;
+  uint8_t modulation;
+  uint8_t pressure;
+  int bend;
+  uint64_t last_seen_nanos;
+} TuiLiveChannelState;
+
 typedef struct TuiApp TuiApp;
 
 typedef struct TuiMonitorSession {
@@ -128,6 +137,7 @@ struct TuiApp {
   TuiPlaybackSession playback;
   TuiSettings settings;
   TuiLiveNoteState live_notes[16][128];
+  TuiLiveChannelState live_channels[16];
   TuiRenderWorkPaneMode work_pane_mode;
   TuiRenderFocus focus;
   TuiRenderOverlayKind overlay;
@@ -318,6 +328,7 @@ static void update_live_note_state(TuiApp *app, const uint8_t *bytes,
   uint8_t data2;
   unsigned int channel;
   TuiLiveNoteState *note_state;
+  TuiLiveChannelState *channel_state;
   uint64_t now_nanos;
 
   if (app == NULL || bytes == NULL || length == 0) {
@@ -333,6 +344,11 @@ static void update_live_note_state(TuiApp *app, const uint8_t *bytes,
   data2 = length > 2 ? bytes[2] : 0;
   channel = (unsigned int)(status & 0x0Fu);
   now_nanos = host_time_now_nanos();
+
+  channel_state = &app->live_channels[channel];
+  channel_state->seen = true;
+  channel_state->channel = (uint8_t)(channel + 1u);
+  channel_state->last_seen_nanos = now_nanos;
 
   switch (status & 0xF0u) {
   case 0x80:
@@ -355,6 +371,7 @@ static void update_live_note_state(TuiApp *app, const uint8_t *bytes,
     break;
   case 0xB0:
     if (data1 == 1) {
+      channel_state->modulation = data2;
       for (size_t note = 0; note < 128; ++note) {
         if (app->live_notes[channel][note].seen) {
           app->live_notes[channel][note].modulation = data2;
@@ -364,6 +381,7 @@ static void update_live_note_state(TuiApp *app, const uint8_t *bytes,
     }
     break;
   case 0xD0:
+    channel_state->pressure = data1;
     for (size_t note = 0; note < 128; ++note) {
       if (app->live_notes[channel][note].seen) {
         app->live_notes[channel][note].pressure = data1;
@@ -374,6 +392,7 @@ static void update_live_note_state(TuiApp *app, const uint8_t *bytes,
   case 0xE0: {
     int bend = ((int)data2 << 7) | (int)data1;
     bend -= 8192;
+    channel_state->bend = bend;
     for (size_t note = 0; note < 128; ++note) {
       if (app->live_notes[channel][note].seen) {
         app->live_notes[channel][note].bend = bend;
@@ -1491,7 +1510,75 @@ static size_t fill_live_note_rows(TuiApp *app, TuiRenderLiveNoteRow *rows,
       count += 1;
     }
   }
+  for (size_t i = 0; i < count; ++i) {
+    char numbered[TUI_RENDER_FIELD_TEXT_LENGTH];
+    snprintf(numbered, sizeof(numbered), "%zu/%zu", i + 1, count);
+    snprintf(rows[i].number, sizeof(rows[i].number), "%s", numbered);
+  }
   return count;
+}
+
+static void format_age_short(uint64_t now_nanos, uint64_t last_nanos, char *out,
+                             size_t out_size) {
+  if (out == NULL || out_size == 0) {
+    return;
+  }
+  if (last_nanos == 0 || now_nanos < last_nanos) {
+    snprintf(out, out_size, "--");
+    return;
+  }
+  uint64_t delta = now_nanos - last_nanos;
+  double seconds = (double)delta / 1000000000.0;
+  if (seconds < 1.0) {
+    snprintf(out, out_size, "%ums", (unsigned int)(seconds * 1000.0));
+  } else if (seconds < 10.0) {
+    snprintf(out, out_size, "%.1fs", seconds);
+  } else {
+    snprintf(out, out_size, "%us", (unsigned int)seconds);
+  }
+}
+
+static void fill_live_controls_row(TuiApp *app, TuiRenderLiveControlRow *row,
+                                   uint64_t now_nanos) {
+  TuiLiveChannelState *best = NULL;
+
+  if (app == NULL || row == NULL) {
+    return;
+  }
+  memset(row, 0, sizeof(*row));
+
+  for (size_t i = 0; i < 16; ++i) {
+    TuiLiveChannelState *state = &app->live_channels[i];
+    if (!state->seen) {
+      continue;
+    }
+    if (best == NULL || state->last_seen_nanos > best->last_seen_nanos) {
+      best = state;
+    }
+  }
+
+  if (best == NULL) {
+    snprintf(row->scope, sizeof(row->scope), "CH -");
+    snprintf(row->modulation, sizeof(row->modulation), "mod --");
+    snprintf(row->pressure, sizeof(row->pressure), "press --");
+    snprintf(row->pitch, sizeof(row->pitch), "bend +0");
+    snprintf(row->last_rx, sizeof(row->last_rx), "RX --");
+    row->active = false;
+    return;
+  }
+
+  snprintf(row->scope, sizeof(row->scope), "CH %u",
+           (unsigned int)best->channel);
+  snprintf(row->modulation, sizeof(row->modulation), "mod %u",
+           (unsigned int)best->modulation);
+  snprintf(row->pressure, sizeof(row->pressure), "press %u",
+           (unsigned int)best->pressure);
+  snprintf(row->pitch, sizeof(row->pitch), "bend %+d", best->bend);
+
+  char age[TUI_RENDER_FIELD_TEXT_LENGTH];
+  format_age_short(now_nanos, best->last_seen_nanos, age, sizeof(age));
+  snprintf(row->last_rx, sizeof(row->last_rx), "RX %s", age);
+  row->active = true;
 }
 
 static void render_tui(TuiApp *app) {
@@ -1511,8 +1598,8 @@ static void render_tui(TuiApp *app) {
   memset(&state, 0, sizeof(state));
   describe_endpoint(true, 0, source_name, sizeof(source_name));
   describe_endpoint(false, 0, destination_name, sizeof(destination_name));
-  snprintf(source_label, sizeof(source_label), "Source [0]: %s", source_name);
-  snprintf(destination_label, sizeof(destination_label), "Destination [0]: %s",
+  snprintf(source_label, sizeof(source_label), "SRC [0] %s", source_name);
+  snprintf(destination_label, sizeof(destination_label), "DST [0] %s",
            destination_name);
   format_footer_summary(app, footer, sizeof(footer));
   snprintf(middle_c_label, sizeof(middle_c_label), "C%d",
@@ -1547,6 +1634,7 @@ static void render_tui(TuiApp *app) {
   state.live_notes = live_note_rows;
   state.live_note_count = fill_live_note_rows(
       app, live_note_rows, TUI_RENDER_LIVE_NOTE_MAX, now_nanos);
+  fill_live_controls_row(app, &state.live_controls, now_nanos);
   state.overlay = app->overlay;
   state.settings.selected_index = app->settings.selected_index;
   state.settings.recordings_dir = app->recordings_dir;
