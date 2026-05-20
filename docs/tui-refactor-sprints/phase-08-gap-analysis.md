@@ -256,3 +256,22 @@ navigation model.
 `make clean && make && make test` pass on the current branch. The 90×20 and
 90×24 layout paths are exercised by the existing render-state unit tests. No
 regressions observed from this analysis.
+
+## Remediation Closure (2026-05-14)
+
+Remediation phases R0–R4 from `phase-08-remediation-plan.md` were executed and
+verified with `make && make test` (clean). Gap status after remediation:
+
+- Gaps 1, 2, 3, 4, 5, 6, 7, 9, 10, 11 — **closed** by R1/R2/R3/R4 code in
+  `src/tui_render.c` and `src/command_tui.c` (sequence event/total formatting,
+  Live Player channel-scope row, status doc updated, `RX*`/`RX.` and `TX*`/`TX.`
+  rail, mode-label colouring across all three work-pane titles, widened
+  Sequence columns at default width with compact fallback, `Files` title,
+  compact-mode shorter command strip, settings overlay notes column, version
+  pinned to right edge of rail).
+- Gap 8 — **closed**; `phase-08-delivery-plan.md` checkboxes ticked after
+  remediation verification.
+- Phase 9 directory-browser remains deferred to its own sprint (not in scope
+  here).
+- V3 PDF cross-check skipped during remediation; HTML/CSS V3 source treated
+  as authoritative reference.

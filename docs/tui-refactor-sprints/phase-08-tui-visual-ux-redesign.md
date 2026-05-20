@@ -2,7 +2,10 @@
 
 **Depends on:** Phase 7
 
-**Status:** Not started
+**Status:** Implemented; remediation pass R0–R4 verified 2026-05-14 against
+the V3 mockup HTML/CSS reference. The V3 PDF was not used for static visual
+cross-check during remediation (HTML/CSS source treated as the authoritative
+reference).
 
 ## Objective
 

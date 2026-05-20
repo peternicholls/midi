@@ -2,7 +2,7 @@
 
 **Depends on:** Phase 7
 
-**Status:** Planned
+**Status:** Implemented (verified after Phase 8 remediation 2026-05-14)
 
 ## Purpose
 
@@ -57,20 +57,20 @@ Files:
 
 Tasks:
 
-- [ ] Add an internal `TuiLayout` struct covering the status rail, command
+- [x] Add an internal `TuiLayout` struct covering the status rail, command
       strip, file pane, work pane, footer, and overlay rectangle.
-- [ ] Centralise width and height calculations in `tui_render.c`.
-- [ ] Clamp file-pane width to 28-36 columns.
-- [ ] Preserve the existing resize guard below 90x20.
-- [ ] Add compact layout behaviour for 90x20 through 90x23.
-- [ ] Document preferred behaviour for 90x24, 120x36, and wide terminals in
+- [x] Centralise width and height calculations in `tui_render.c`.
+- [x] Clamp file-pane width to 28-36 columns.
+- [x] Preserve the existing resize guard below 90x20.
+- [x] Add compact layout behaviour for 90x20 through 90x23.
+- [x] Document preferred behaviour for 90x24, 120x36, and wide terminals in
       code comments where the math is not obvious.
 
 Verification:
 
-- [ ] `make`
-- [ ] `make test`
-- [ ] Manual resize checks at 90x20, 90x24, 120x36, and 150x40+
+- [x] `make`
+- [x] `make test`
+- [x] Manual resize checks at 90x20, 90x24, 120x36, and 150x40+
 
 ### Story P8A.2: Add Status Rail And Command Strip
 
@@ -86,18 +86,18 @@ Files:
 
 Tasks:
 
-- [ ] Define a single app-version source for the renderer.
-- [ ] Render app label, mode label, RX/TX activity, source, destination, and
+- [x] Define a single app-version source for the renderer.
+- [x] Render app label, mode label, RX/TX activity, source, destination, and
       clipped recordings path in the status rail.
-- [ ] Render a mode-aware command strip below the rail.
-- [ ] Move repeated key hints out of the footer.
-- [ ] Keep footer content focused on current status and transport summary.
+- [x] Render a mode-aware command strip below the rail.
+- [x] Move repeated key hints out of the footer.
+- [x] Keep footer content focused on current status and transport summary.
 
 Verification:
 
-- [ ] `make`
-- [ ] `make test`
-- [ ] Manual check that recording/playback state is readable without relying on
+- [x] `make`
+- [x] `make test`
+- [x] Manual check that recording/playback state is readable without relying on
       the footer
 
 ### Story P8A.3: Lock The Persistent File Pane Behaviour
@@ -112,18 +112,18 @@ Files:
 
 Tasks:
 
-- [ ] Keep the file pane full height beneath the top rail.
-- [ ] Confirm reverse-video selection remains limited to the file list.
-- [ ] Clip long file names cleanly in the list.
-- [ ] Keep directory path presentation in the status rail rather than the file
+- [x] Keep the file pane full height beneath the top rail.
+- [x] Confirm reverse-video selection remains limited to the file list.
+- [x] Clip long file names cleanly in the list.
+- [x] Keep directory path presentation in the status rail rather than the file
       pane.
-- [ ] Preserve current keyboard navigation while decoupling selection from file
+- [x] Preserve current keyboard navigation while decoupling selection from file
       loading.
 
 Verification:
 
-- [ ] `make test`
-- [ ] Manual file navigation check with mixed short and long `.mid` names
+- [x] `make test`
+- [x] Manual file navigation check with mixed short and long `.mid` names
 
 Exit criteria:
 
@@ -146,15 +146,15 @@ Files:
 
 Tasks:
 
-- [ ] Add a helper that renders text inside a fixed cell width.
-- [ ] Support optional attributes per cell rather than per row.
-- [ ] Ensure clipping is deterministic in compact and default layouts.
-- [ ] Keep ASCII-safe rendering behaviour.
+- [x] Add a helper that renders text inside a fixed cell width.
+- [x] Support optional attributes per cell rather than per row.
+- [x] Ensure clipping is deterministic in compact and default layouts.
+- [x] Keep ASCII-safe rendering behaviour.
 
 Verification:
 
-- [ ] `make`
-- [ ] Manual check with long paths, descriptions, and byte strings
+- [x] `make`
+- [x] Manual check with long paths, descriptions, and byte strings
 
 ### Story P8B.2: Render The Sequence Table By Columns
 
@@ -167,17 +167,17 @@ Files:
 
 Tasks:
 
-- [ ] Add a sequence header row.
-- [ ] Render marker, `#/`, time, channel, event, target, value, and raw columns
+- [x] Add a sequence header row.
+- [x] Render marker, `#/`, time, channel, event, target, value, and raw columns
       separately.
-- [ ] Keep selected/current indication on a leading `>` marker.
-- [ ] Keep raw bytes visible but secondary.
-- [ ] Avoid a direction column in Sequence mode.
+- [x] Keep selected/current indication on a leading `>` marker.
+- [x] Keep raw bytes visible but secondary.
+- [x] Avoid a direction column in Sequence mode.
 
 Verification:
 
-- [ ] `make test`
-- [ ] Manual check that long raw bytes do not overwrite the value or footer
+- [x] `make test`
+- [x] Manual check that long raw bytes do not overwrite the value or footer
 
 Exit criteria:
 
@@ -203,15 +203,15 @@ Files:
 
 Tasks:
 
-- [ ] Add a right-pane mode enum.
-- [ ] Add keyboard flow for switching or cycling the active work-pane mode.
-- [ ] Feed the renderer the active mode and mode-specific headers.
-- [ ] Keep file-pane focus behaviour separate from work-pane mode.
+- [x] Add a right-pane mode enum.
+- [x] Add keyboard flow for switching or cycling the active work-pane mode.
+- [x] Feed the renderer the active mode and mode-specific headers.
+- [x] Keep file-pane focus behaviour separate from work-pane mode.
 
 Verification:
 
-- [ ] `make`
-- [ ] Manual mode-switch check across all three panes and overlays
+- [x] `make`
+- [x] Manual mode-switch check across all three panes and overlays
 
 ### Story P8C.2: Extend `TuiLogEntry` With Structured MIDI Fields
 
@@ -226,18 +226,18 @@ Files:
 
 Tasks:
 
-- [ ] Add optional structured fields for time, direction, channel, event,
+- [x] Add optional structured fields for time, direction, channel, event,
       target, value, bytes, description, and category.
-- [ ] Preserve plain-text compatibility for non-MIDI log rows.
-- [ ] Update `log_midi_bytes()` or equivalent live append paths to populate the
+- [x] Preserve plain-text compatibility for non-MIDI log rows.
+- [x] Update `log_midi_bytes()` or equivalent live append paths to populate the
       structured fields.
-- [ ] Keep ring-buffer ownership and snapshot behaviour unchanged.
+- [x] Keep ring-buffer ownership and snapshot behaviour unchanged.
 
 Verification:
 
-- [ ] `make`
-- [ ] `make test`
-- [ ] Add or update tests for structured snapshot content
+- [x] `make`
+- [x] `make test`
+- [x] Add or update tests for structured snapshot content
 
 ### Story P8C.3: Implement Live Diagnostic And Live Player Rendering
 
@@ -252,21 +252,21 @@ Files:
 
 Tasks:
 
-- [ ] Add a lightweight live-note state snapshot owned outside the renderer.
-- [ ] Render Live Diagnostic rows from structured fields instead of formatted
+- [x] Add a lightweight live-note state snapshot owned outside the renderer.
+- [x] Render Live Diagnostic rows from structured fields instead of formatted
       log strings.
-- [ ] Render Live Diagnostic time, direction, channel, event, target, value,
+- [x] Render Live Diagnostic time, direction, channel, event, target, value,
       raw, and description columns.
-- [ ] Render `#/`, note, state, velocity, pressure, bend/mod, and age columns.
-- [ ] Keep numeric values present for every bar or compact visual treatment.
-- [ ] Support fading and expiry without introducing unreadable churn.
-- [ ] Represent channel pressure, poly pressure, modulation, and bend clearly.
+- [x] Render `#/`, note, state, velocity, pressure, bend/mod, and age columns.
+- [x] Keep numeric values present for every bar or compact visual treatment.
+- [x] Support fading and expiry without introducing unreadable churn.
+- [x] Represent channel pressure, poly pressure, modulation, and bend clearly.
 
 Verification:
 
-- [ ] `make`
-- [ ] `make test`
-- [ ] Manual live-input check with note on/off, modulation, pressure, and pitch
+- [x] `make`
+- [x] `make test`
+- [x] Manual live-input check with note on/off, modulation, pressure, and pitch
       bend
 
 Exit criteria:
@@ -293,17 +293,17 @@ Files:
 
 Tasks:
 
-- [ ] Keep moving the file selection from implicitly reloading the sequence.
-- [ ] Add explicit load on `enter`.
-- [ ] Add unload flow on `u`.
-- [ ] Add append-to-loaded-file flow on `a` with explicit user intent.
-- [ ] Add rename flow on `r` that preserves the `.mid` suffix.
-- [ ] Update command-strip hints to match the new actions.
+- [x] Keep moving the file selection from implicitly reloading the sequence.
+- [x] Add explicit load on `enter`.
+- [x] Add unload flow on `u`.
+- [x] Add append-to-loaded-file flow on `a` with explicit user intent.
+- [x] Add rename flow on `r` that preserves the `.mid` suffix.
+- [x] Update command-strip hints to match the new actions.
 
 Verification:
 
-- [ ] `make test`
-- [ ] Manual check for load, unload, append, and rename flows
+- [x] `make test`
+- [x] Manual check for load, unload, append, and rename flows
 
 ### Story P8D.2: Add Settings Overlay Model
 
@@ -319,17 +319,17 @@ Files:
 
 Tasks:
 
-- [ ] Define overlay state for recordings directory, middle C convention, note
+- [x] Define overlay state for recordings directory, middle C convention, note
       format, fade timeout, tempo, and metronome.
-- [ ] Render a centred keyboard-first popover.
-- [ ] Add selection and adjustment controls.
-- [ ] Reflect settings values in footer or rail text where useful.
+- [x] Render a centred keyboard-first popover.
+- [x] Add selection and adjustment controls.
+- [x] Reflect settings values in footer or rail text where useful.
 
 Verification:
 
-- [ ] `make`
-- [ ] `make test`
-- [ ] Manual settings interaction check
+- [x] `make`
+- [x] `make test`
+- [x] Manual settings interaction check
 
 ### Story P8D.3: Prepare Phase 9 Directory Browser Hooks
 
@@ -344,16 +344,16 @@ Files:
 
 Tasks:
 
-- [ ] Keep `d` as the discoverable directory-browser entry point.
-- [ ] Reserve overlay and footer/status surfaces for the future browser.
-- [ ] Preserve the manual-path escape hatch until Phase 9 replaces it.
-- [ ] Document that column rendering, browser navigation, and destination apply
+- [x] Keep `d` as the discoverable directory-browser entry point.
+- [x] Reserve overlay and footer/status surfaces for the future browser.
+- [x] Preserve the manual-path escape hatch until Phase 9 replaces it.
+- [x] Document that column rendering, browser navigation, and destination apply
       flow are owned by Phase 9.
 
 Verification:
 
-- [ ] `make test`
-- [ ] Manual check that the browser entry point and placeholder/status handling
+- [x] `make test`
+- [x] Manual check that the browser entry point and placeholder/status handling
       do not regress existing directory changes
 
 Exit criteria:
@@ -378,15 +378,15 @@ Files:
 
 Tasks:
 
-- [ ] Add `space` play/stop or pause/resume behaviour.
-- [ ] Add `0` and `home` to return the playhead to the start.
-- [ ] Keep `p` for play-from-selected-event in Sequence mode.
-- [ ] Keep status text aligned with the active transport state.
+- [x] Add `space` play/stop or pause/resume behaviour.
+- [x] Add `0` and `home` to return the playhead to the start.
+- [x] Keep `p` for play-from-selected-event in Sequence mode.
+- [x] Keep status text aligned with the active transport state.
 
 Verification:
 
-- [ ] `make test`
-- [ ] Manual transport-flow check during sequence playback and live monitoring
+- [x] `make test`
+- [x] Manual transport-flow check during sequence playback and live monitoring
 
 ### Story P8E.2: Add Tempo And Metronome Support
 
@@ -401,16 +401,16 @@ Files:
 
 Tasks:
 
-- [ ] Add tempo state for playback scaling.
-- [ ] Keep playback event order intact under tempo changes.
-- [ ] Add a simple recording metronome toggle.
-- [ ] Surface tempo and metronome state in the UI.
+- [x] Add tempo state for playback scaling.
+- [x] Keep playback event order intact under tempo changes.
+- [x] Add a simple recording metronome toggle.
+- [x] Surface tempo and metronome state in the UI.
 
 Verification:
 
-- [ ] `make`
-- [ ] `make test`
-- [ ] Manual tempo and metronome check
+- [x] `make`
+- [x] `make test`
+- [x] Manual tempo and metronome check
 
 ### Story P8E.3: Complete Semantic Colour And Accessibility Pass
 
@@ -423,21 +423,21 @@ Files:
 
 Tasks:
 
-- [ ] Finalise semantic colour pairs for note on, note off, control change,
+- [x] Finalise semantic colour pairs for note on, note off, control change,
       program or pressure, pitch bend, SysEx, unsupported messages, active
       recording, active playback, and muted raw bytes.
-- [ ] Replace any remaining SysEx `COLOR_WHITE` treatment with a neutral-safe
+- [x] Replace any remaining SysEx `COLOR_WHITE` treatment with a neutral-safe
       fallback.
-- [ ] Keep colour on foreground text only for data tables.
-- [ ] Ensure mode, focus, state, and bars all remain understandable as text.
-- [ ] Confirm no rapid flashing behaviour is introduced.
+- [x] Keep colour on foreground text only for data tables.
+- [x] Ensure mode, focus, state, and bars all remain understandable as text.
+- [x] Confirm no rapid flashing behaviour is introduced.
 
 Verification:
 
-- [ ] `make`
-- [ ] `make test`
-- [ ] Manual colour-terminal check
-- [ ] Manual monochrome or limited-colour terminal check
+- [x] `make`
+- [x] `make test`
+- [x] Manual colour-terminal check
+- [x] Manual monochrome or limited-colour terminal check
 
 ### Story P8E.4: Final Phase-8 Verification Pass
 
@@ -445,14 +445,14 @@ Goal: close the phase with explicit evidence instead of informal confidence.
 
 Tasks:
 
-- [ ] Run `make clean`
-- [ ] Run `make`
-- [ ] Run `make test`
-- [ ] Manually verify 90x20, 90x24, comfortable desktop, and wide-terminal
+- [x] Run `make clean`
+- [x] Run `make`
+- [x] Run `make test`
+- [x] Manually verify 90x20, 90x24, comfortable desktop, and wide-terminal
       layouts.
-- [ ] Manually verify recording, playback, navigation, settings, directory
+- [x] Manually verify recording, playback, navigation, settings, directory
       browsing, and live monitoring.
-- [ ] Capture verification notes back into the Phase 8 redesign document.
+- [x] Capture verification notes back into the Phase 8 redesign document.
 
 Exit criteria:
 
