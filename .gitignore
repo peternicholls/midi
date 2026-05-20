@@ -1,9 +1,15 @@
 .omx/
 
-/midi-capture
+/midi
 /test_midi_parser
 /test_midi_sequence
 /test_status_line
+/test_midi_describe
+/test_midi_recorder
+/test_tui_files
+/test_tui_log
+/test_tui_model
+
 /output.mid
 
 .DS_Store
