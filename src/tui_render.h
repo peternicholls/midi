@@ -57,6 +57,8 @@ typedef struct TuiRenderLiveNoteRow {
   char age[TUI_RENDER_FIELD_TEXT_LENGTH];
   MidiDescriptionCategory category;
   bool active;
+  int raw_velocity;
+  int raw_pressure;
 } TuiRenderLiveNoteRow;
 
 typedef struct TuiRenderLiveControlRow {
@@ -66,6 +68,9 @@ typedef struct TuiRenderLiveControlRow {
   char pitch[TUI_RENDER_FIELD_TEXT_LENGTH];
   char last_rx[TUI_RENDER_FIELD_TEXT_LENGTH];
   bool active;
+  int raw_modulation;
+  int raw_pressure;
+  int raw_pitch;
 } TuiRenderLiveControlRow;
 
 typedef struct TuiRenderSettingsState {

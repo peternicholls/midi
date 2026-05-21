@@ -145,7 +145,11 @@ struct TuiApp {
   char status_message[TUI_MAX_STATUS];
   time_t last_scan_time;
   bool append_armed;
+  bool live_hold;
+  bool diagnostic_log_paused;
+  bool diagnostic_filter_midi_only;
   unsigned long metronome_next_beat;
+  int channel_scope;
 };
 
 static void set_osstatus_error(TuiApp *app, const char *label, OSStatus status);
@@ -420,7 +424,13 @@ static void log_midi_bytes(TuiApp *app, const char *label, double seconds,
   midi_describe_bytes(bytes, length, &description);
   fill_midi_display_fields(&app->settings, bytes, length, &description,
                            &display_fields);
-  update_live_note_state(app, bytes, length);
+  if (!app->live_hold) {
+    update_live_note_state(app, bytes, length);
+  }
+
+  if (app->diagnostic_log_paused) {
+    return;
+  }
 
   memset(&log_fields, 0, sizeof(log_fields));
   snprintf(log_fields.time, sizeof(log_fields.time), "%s", clock_text);
@@ -1366,6 +1376,70 @@ static const char *current_mode_label(const TuiApp *app) {
   return "IDLE";
 }
 
+static double fade_timeout_seconds(TuiFadeTimeout timeout);
+static const char *fade_timeout_label(TuiFadeTimeout timeout);
+
+static void live_scope_channel_range(const TuiApp *app, size_t *start_channel,
+                                     size_t *end_channel) {
+  if (start_channel == NULL || end_channel == NULL) {
+    return;
+  }
+  *start_channel = 0;
+  *end_channel = 16;
+  if (app != NULL && app->channel_scope > 0 && app->channel_scope <= 16) {
+    *start_channel = (size_t)app->channel_scope - 1;
+    *end_channel = (size_t)app->channel_scope;
+  }
+}
+
+static void format_channel_scope_label(const TuiApp *app, char *buffer,
+                                       size_t buffer_size) {
+  if (buffer == NULL || buffer_size == 0) {
+    return;
+  }
+  if (app != NULL && app->channel_scope > 0 && app->channel_scope <= 16) {
+    snprintf(buffer, buffer_size, "CH %d", app->channel_scope);
+  } else {
+    snprintf(buffer, buffer_size, "CH AUTO");
+  }
+}
+
+static bool live_note_is_visible(const TuiLiveNoteState *state,
+                                 uint64_t now_nanos, double timeout_seconds,
+                                 double *age_seconds) {
+  double age = 0.0;
+
+  if (state == NULL || !state->seen || state->last_seen_nanos == 0) {
+    return false;
+  }
+  if (now_nanos >= state->last_seen_nanos) {
+    age = (double)(now_nanos - state->last_seen_nanos) / 1000000000.0;
+  }
+  if (age_seconds != NULL) {
+    *age_seconds = age;
+  }
+  if (!state->active && timeout_seconds >= 0.0 && age > timeout_seconds) {
+    return false;
+  }
+  return true;
+}
+
+static size_t filter_diagnostic_log_snapshot(TuiLogEntry *entries, size_t count,
+                                             bool midi_only) {
+  size_t kept = 0;
+
+  if (entries == NULL || !midi_only) {
+    return count;
+  }
+  for (size_t index = 0; index < count; ++index) {
+    if (!entries[index].has_midi_fields) {
+      continue;
+    }
+    entries[kept++] = entries[index];
+  }
+  return kept;
+}
+
 static void format_footer_summary(TuiApp *app, char *summary,
                                   size_t summary_size) {
   char clock_text[32];
@@ -1385,6 +1459,46 @@ static void format_footer_summary(TuiApp *app, char *summary,
                                           : app->record.output_path,
              app->settings.tempo_bpm,
              app->settings.metronome_enabled ? "on" : "off");
+  } else if (app->work_pane_mode == TUI_RENDER_WORK_PANE_LIVE_PLAYER) {
+    size_t active_count = 0;
+    size_t fading_count = 0;
+    size_t start_channel;
+    size_t end_channel;
+    uint64_t now_nanos = host_time_now_nanos();
+    double timeout_seconds = fade_timeout_seconds(app->settings.fade_timeout);
+    char scope_label[16];
+    char note_format_label[16];
+    const char *fade_label = fade_timeout_label(app->settings.fade_timeout);
+
+    live_scope_channel_range(app, &start_channel, &end_channel);
+    for (size_t channel = start_channel; channel < end_channel; ++channel) {
+      for (size_t note = 0; note < 128; ++note) {
+        TuiLiveNoteState *state = &app->live_notes[channel][note];
+        if (!live_note_is_visible(state, now_nanos, timeout_seconds, NULL)) {
+          continue;
+        }
+        if (state->active) {
+          active_count++;
+        } else {
+          fading_count++;
+        }
+      }
+    }
+    format_channel_scope_label(app, scope_label, sizeof(scope_label));
+    snprintf(note_format_label, sizeof(note_format_label), "%s",
+             app->settings.note_format == TUI_NOTE_FORMAT_NAME ? "name"
+                                                               : "number");
+
+    snprintf(summary, summary_size,
+             "%s  %s  %zu active  %zu fading  hold: %s  format: %s  fade: %s",
+             app->status_message, scope_label, active_count, fading_count,
+             app->live_hold ? "on" : "off", note_format_label, fade_label);
+  } else if (app->work_pane_mode == TUI_RENDER_WORK_PANE_LIVE_DIAGNOSTIC) {
+    snprintf(
+        summary, summary_size,
+        "Live Diagnostic  filters: %s  capture paused: %s  raw bytes visible",
+        app->diagnostic_filter_midi_only ? "midi only" : "off",
+        app->diagnostic_log_paused ? "yes" : "no");
   } else if (app->playback.active || app->playback.loaded) {
     tui_format_clock_time(clock_text, sizeof(clock_text),
                           playback_position_seconds(app));
@@ -1464,27 +1578,24 @@ static size_t fill_live_note_rows(TuiApp *app, TuiRenderLiveNoteRow *rows,
                                   size_t capacity, uint64_t now_nanos) {
   size_t count = 0;
   double timeout_seconds;
+  size_t start_channel = 0;
+  size_t end_channel = 16;
 
   if (app == NULL || rows == NULL || capacity == 0) {
     return 0;
   }
 
+  live_scope_channel_range(app, &start_channel, &end_channel);
+
   timeout_seconds = fade_timeout_seconds(app->settings.fade_timeout);
-  for (size_t channel = 0; channel < 16; ++channel) {
+  for (size_t channel = start_channel; channel < end_channel; ++channel) {
     for (size_t note = 0; note < 128; ++note) {
       TuiLiveNoteState *state = &app->live_notes[channel][note];
       TuiRenderLiveNoteRow *row;
       double age_seconds = 0.0;
 
-      if (!state->seen || state->last_seen_nanos == 0) {
-        continue;
-      }
-      if (now_nanos >= state->last_seen_nanos) {
-        age_seconds =
-            (double)(now_nanos - state->last_seen_nanos) / 1000000000.0;
-      }
-      if (!state->active && timeout_seconds >= 0.0 &&
-          age_seconds > timeout_seconds) {
+      if (!live_note_is_visible(state, now_nanos, timeout_seconds,
+                                &age_seconds)) {
         continue;
       }
       if (count >= capacity) {
@@ -1507,6 +1618,8 @@ static size_t fill_live_note_rows(TuiApp *app, TuiRenderLiveNoteRow *rows,
       row->active = state->active;
       row->category =
           state->active ? MIDI_DESCRIPTION_NOTE_ON : MIDI_DESCRIPTION_NOTE_OFF;
+      row->raw_velocity = state->velocity;
+      row->raw_pressure = state->pressure;
       count += 1;
     }
   }
@@ -1547,38 +1660,55 @@ static void fill_live_controls_row(TuiApp *app, TuiRenderLiveControlRow *row,
   }
   memset(row, 0, sizeof(*row));
 
-  for (size_t i = 0; i < 16; ++i) {
-    TuiLiveChannelState *state = &app->live_channels[i];
-    if (!state->seen) {
-      continue;
+  if (app->channel_scope == 0) {
+    for (size_t i = 0; i < 16; ++i) {
+      TuiLiveChannelState *state = &app->live_channels[i];
+      if (!state->seen) {
+        continue;
+      }
+      if (best == NULL || state->last_seen_nanos > best->last_seen_nanos) {
+        best = state;
+      }
     }
-    if (best == NULL || state->last_seen_nanos > best->last_seen_nanos) {
-      best = state;
-    }
+  } else {
+    best = &app->live_channels[app->channel_scope - 1];
   }
 
-  if (best == NULL) {
-    snprintf(row->scope, sizeof(row->scope), "CH -");
-    snprintf(row->modulation, sizeof(row->modulation), "mod --");
-    snprintf(row->pressure, sizeof(row->pressure), "press --");
-    snprintf(row->pitch, sizeof(row->pitch), "bend +0");
+  if (best == NULL || (app->channel_scope > 0 && !best->seen)) {
+    if (app->channel_scope > 0) {
+      snprintf(row->scope, sizeof(row->scope), "CH %d", app->channel_scope);
+    } else {
+      snprintf(row->scope, sizeof(row->scope), "CH AUTO");
+    }
+    snprintf(row->modulation, sizeof(row->modulation), "0");
+    snprintf(row->pressure, sizeof(row->pressure), "0");
+    snprintf(row->pitch, sizeof(row->pitch), "+0");
     snprintf(row->last_rx, sizeof(row->last_rx), "RX --");
     row->active = false;
+    row->raw_modulation = 0;
+    row->raw_pressure = 0;
+    row->raw_pitch = 0;
     return;
   }
 
-  snprintf(row->scope, sizeof(row->scope), "CH %u",
-           (unsigned int)best->channel);
-  snprintf(row->modulation, sizeof(row->modulation), "mod %u",
+  if (app->channel_scope > 0) {
+    snprintf(row->scope, sizeof(row->scope), "CH %d", app->channel_scope);
+  } else {
+    snprintf(row->scope, sizeof(row->scope), "CH AUTO");
+  }
+  snprintf(row->modulation, sizeof(row->modulation), "%u",
            (unsigned int)best->modulation);
-  snprintf(row->pressure, sizeof(row->pressure), "press %u",
+  snprintf(row->pressure, sizeof(row->pressure), "%u",
            (unsigned int)best->pressure);
-  snprintf(row->pitch, sizeof(row->pitch), "bend %+d", best->bend);
+  snprintf(row->pitch, sizeof(row->pitch), "%+d", best->bend);
 
   char age[TUI_RENDER_FIELD_TEXT_LENGTH];
   format_age_short(now_nanos, best->last_seen_nanos, age, sizeof(age));
   snprintf(row->last_rx, sizeof(row->last_rx), "RX %s", age);
   row->active = true;
+  row->raw_modulation = (int)best->modulation;
+  row->raw_pressure = (int)best->pressure;
+  row->raw_pitch = (int)best->bend;
 }
 
 static void render_tui(TuiApp *app) {
@@ -1593,14 +1723,20 @@ static void render_tui(TuiApp *app) {
   char middle_c_label[16];
   char tempo_label[24];
   char directory_overlay_message[TUI_MAX_STATUS];
+  size_t log_count;
   uint64_t now_nanos = host_time_now_nanos();
 
   memset(&state, 0, sizeof(state));
   describe_endpoint(true, 0, source_name, sizeof(source_name));
   describe_endpoint(false, 0, destination_name, sizeof(destination_name));
   snprintf(source_label, sizeof(source_label), "SRC [0] %s", source_name);
-  snprintf(destination_label, sizeof(destination_label), "DST [0] %s",
-           destination_name);
+  if (app->work_pane_mode == TUI_RENDER_WORK_PANE_LIVE_PLAYER) {
+    format_channel_scope_label(app, destination_label,
+                               sizeof(destination_label));
+  } else {
+    snprintf(destination_label, sizeof(destination_label), "DST [0] %s",
+             destination_name);
+  }
   format_footer_summary(app, footer, sizeof(footer));
   snprintf(middle_c_label, sizeof(middle_c_label), "C%d",
            app->settings.middle_c_octave);
@@ -1629,8 +1765,11 @@ static void render_tui(TuiApp *app) {
   state.sequence_selected = app->playback.selected_event;
   state.sequence_row_provider = fill_sequence_render_row;
   state.sequence_context = app;
+  log_count = tui_log_snapshot(app->log, log_snapshot, TUI_LOG_CAPACITY);
+  log_count = filter_diagnostic_log_snapshot(log_snapshot, log_count,
+                                             app->diagnostic_filter_midi_only);
   state.logs = log_snapshot;
-  state.log_count = tui_log_snapshot(app->log, log_snapshot, TUI_LOG_CAPACITY);
+  state.log_count = log_count;
   state.live_notes = live_note_rows;
   state.live_note_count = fill_live_note_rows(
       app, live_note_rows, TUI_RENDER_LIVE_NOTE_MAX, now_nanos);
@@ -1694,6 +1833,7 @@ static void prompt_for_output_directory(TuiApp *app) {
   }
 
   getmaxyx(stdscr, rows, cols);
+  clear();
   echo();
   curs_set(1);
   timeout(-1);
@@ -1932,15 +2072,17 @@ static void handle_settings_key(TuiApp *app, int ch) {
   case ',':
     app->overlay = TUI_RENDER_OVERLAY_NONE;
     break;
+  case 'd':
+    app->overlay = TUI_RENDER_OVERLAY_DIRECTORY;
+    break;
   case KEY_UP:
-    if (app->settings.selected_index > 0) {
-      app->settings.selected_index -= 1;
-    }
+    app->settings.selected_index = app->settings.selected_index == 0
+                                        ? setting_count - 1
+                                        : app->settings.selected_index - 1;
     break;
   case KEY_DOWN:
-    if (app->settings.selected_index + 1 < setting_count) {
-      app->settings.selected_index += 1;
-    }
+    app->settings.selected_index =
+        (app->settings.selected_index + 1) % setting_count;
     break;
   case KEY_LEFT:
     adjust_setting(app, -1);
@@ -2062,7 +2204,14 @@ static void handle_keypress(TuiApp *app, int ch, bool *should_quit) {
     }
     break;
   case ' ':
-    if (app->record.active) {
+    if (app->work_pane_mode == TUI_RENDER_WORK_PANE_LIVE_PLAYER) {
+      app->live_hold = !app->live_hold;
+      set_status(app, "Live hold %s", app->live_hold ? "on" : "off");
+    } else if (app->work_pane_mode == TUI_RENDER_WORK_PANE_LIVE_DIAGNOSTIC) {
+      app->diagnostic_log_paused = !app->diagnostic_log_paused;
+      set_status(app, "Diagnostic capture paused: %s",
+                 app->diagnostic_log_paused ? "yes" : "no");
+    } else if (app->record.active) {
       toggle_record_pause(app);
     } else if (app->playback.active) {
       toggle_playback_pause(app);
@@ -2085,6 +2234,23 @@ static void handle_keypress(TuiApp *app, int ch, bool *should_quit) {
     break;
   case 'd':
     app->overlay = TUI_RENDER_OVERLAY_DIRECTORY;
+    break;
+  case 'c':
+    if (app->work_pane_mode == TUI_RENDER_WORK_PANE_LIVE_PLAYER) {
+      app->channel_scope = (app->channel_scope + 1) % 17;
+      if (app->channel_scope == 0) {
+        set_status(app, "Channel scope: AUTO");
+      } else {
+        set_status(app, "Channel scope: CH %d", app->channel_scope);
+      }
+    }
+    break;
+  case 'f':
+    if (app->work_pane_mode == TUI_RENDER_WORK_PANE_LIVE_DIAGNOSTIC) {
+      app->diagnostic_filter_midi_only = !app->diagnostic_filter_midi_only;
+      set_status(app, "Diagnostic filter: %s",
+                 app->diagnostic_filter_midi_only ? "midi only" : "off");
+    }
     break;
   case 'm':
     app->settings.metronome_enabled = !app->settings.metronome_enabled;
@@ -2145,6 +2311,7 @@ static int initialize_tui(TuiApp *app, const char *recordings_dir) {
   app->work_pane_mode = TUI_RENDER_WORK_PANE_SEQUENCE;
   app->focus = TUI_RENDER_FOCUS_FILES;
   app->overlay = TUI_RENDER_OVERLAY_NONE;
+  app->channel_scope = 0;
   midi_output_init(&app->playback.output);
   set_status(app, "Ready");
   if (!ensure_directory_exists(app->recordings_dir)) {
@@ -2183,6 +2350,7 @@ int command_tui(const char *recordings_dir) {
   signal(SIGINT, on_sigint);
   g_stop_requested = 0;
 
+  setenv("ESCDELAY", "25", 1);
   initscr();
   cbreak();
   noecho();
