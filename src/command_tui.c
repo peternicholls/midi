@@ -2077,8 +2077,8 @@ static void handle_settings_key(TuiApp *app, int ch) {
     break;
   case KEY_UP:
     app->settings.selected_index = app->settings.selected_index == 0
-                                        ? setting_count - 1
-                                        : app->settings.selected_index - 1;
+                                       ? setting_count - 1
+                                       : app->settings.selected_index - 1;
     break;
   case KEY_DOWN:
     app->settings.selected_index =
